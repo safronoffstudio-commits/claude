@@ -50,6 +50,25 @@
 браузерами. Опубликованная копия дополнительно синхронизируется через
 хранилище артефакта, если оно доступно; локально этот код просто не включается.
 
+## Деплой на Vercel
+
+Сборки нет: `index.html` лежит в корне, `vercel.json` отключает build-шаг и
+отдаёт корень как статику. Импортируется в Vercel как есть.
+
+1. vercel.com/new → Import Git Repository → `safronoffstudio-commits/claude`.
+2. Framework Preset: **Other**. Build Command и Install Command оставить пустыми,
+   Output Directory — корень. Всё это уже прописано в `vercel.json`.
+3. Settings → Git → **Production Branch**: `claude/todo-site-stats-reminders-y313kn`.
+
+Третий шаг обязателен: ветка по умолчанию в репозитории сейчас
+`claude/video-reels-scenario-xh0ktq`, и в ней нет `index.html` — без смены
+production-ветки Vercel соберёт пустой сайт. Второй вариант — влить эту ветку
+в ветку по умолчанию, тогда третий шаг не нужен.
+
+Через CLI (`vercel --prod`) деплой тоже работает, но из окружения Claude Code
+он недоступен: сетевая политика окружения не пропускает `vercel.com`
+и `api.vercel.com`.
+
 ## Разработка
 
 Зависимостей нет. Правится `index.html`, проверяется открытием в браузере.
