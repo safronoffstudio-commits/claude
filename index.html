@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- ARTIFACT:BEGIN -->
 <title>Дела и дни</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -98,6 +98,7 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 button,input,select,textarea{font:inherit;color:inherit}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
@@ -111,7 +112,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 
 /* ── Каркас ─────────────────────────────────────────────── */
-.wrap{max-width:1160px;margin:0 auto;padding:0 clamp(14px,3vw,28px) 72px}
+.wrap{
+  max-width:1160px;margin:0 auto;padding:0 clamp(14px,3vw,28px) 72px;
+  padding-left:max(clamp(14px,3vw,28px), env(safe-area-inset-left));
+  padding-right:max(clamp(14px,3vw,28px), env(safe-area-inset-right));
+  padding-bottom:calc(72px + env(safe-area-inset-bottom));
+}
 
 .bar{
   position:sticky;top:0;z-index:40;
@@ -122,7 +128,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 .bar-in{
   max-width:1160px;margin:0 auto;padding:10px clamp(14px,3vw,28px);
-  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding-left:max(clamp(14px,3vw,28px), env(safe-area-inset-left));
+  padding-right:max(clamp(14px,3vw,28px), env(safe-area-inset-right));
+  display:flex;align-items:center;gap:16px;
 }
 .wordmark{
   font-family:"Unbounded","Golos Text",sans-serif;font-weight:700;
@@ -136,6 +144,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 .bar-clock{display:flex;align-items:baseline;gap:10px;color:var(--ink-2);font-size:var(--step--1)}
 .bar-clock b{color:var(--ink);font-weight:500}
 .bar-actions{display:flex;gap:8px;align-items:center}
+.bar-actions .ico{display:block;width:17px;height:17px}
+.bar-actions .ico svg{width:100%;height:100%;display:block}
+#notifBtn{display:inline-flex;align-items:center;gap:8px}
+#notifBtn .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
+#notifBtn[data-s="on"] .dot{background:var(--done)}
+#notifBtn[data-s="off"] .dot{background:var(--accent)}
+@media (max-width:760px){
+  .bar-clock{display:none}
+  #notifBtn .lbl{display:none}
+  #notifBtn{padding:9px 11px}
+}
 
 .btn{
   border:1px solid var(--line);background:var(--surface);color:var(--ink);
@@ -153,6 +172,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn-danger:hover{background:var(--accent-soft);border-color:var(--accent)}
 .btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
 .btn-icon{padding:7px 9px;line-height:1}
+@media (hover:none){
+  .btn{padding:12px 16px;min-height:44px}
+  .btn-icon{padding:12px;min-width:44px}
+  .seg button{padding:12px 14px;min-height:44px}
+  .tab{padding:14px 16px}
+}
 
 /* ── Счётчик жизни ──────────────────────────────────────── */
 .meter{
@@ -227,6 +252,10 @@ button,input,select,textarea{font:inherit;color:inherit}
   transition:border-color .14s ease, box-shadow .14s ease;
 }
 .input:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px var(--sunken)}
+@media (max-width:760px){
+  .input,select.input,textarea.input{font-size:16px;padding:11px 12px}
+  .field > label{font-size:.68rem}
+}
 textarea.input{resize:vertical;min-height:64px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
 
@@ -257,13 +286,25 @@ textarea.input{resize:vertical;min-height:64px}
 .card-head h3{margin:0;font-size:var(--step-0);font-weight:600}
 .card-body{padding:16px}
 
-.add-grid{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
+.add-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin-top:12px}
+.add-grid .span-all{grid-column:1/-1}
+#addForm[data-more="0"] .add-grid{display:none}
 @media (min-width:680px){
-  .add-grid{grid-template-columns:minmax(0,2.2fr) minmax(0,1.3fr) minmax(0,.85fr) minmax(0,1fr)}
-  .add-grid .span-all{grid-column:1/-1}
+  #addForm[data-more="0"] .add-grid{display:grid}
+  #moreToggle{display:none}
 }
-.add-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
-.add-foot .hint{color:var(--ink-3);font-size:var(--step--1);margin-right:auto}
+.quickdue{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.quickdue button{
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);
+  border-radius:99px;padding:7px 13px;cursor:pointer;font-size:var(--step--1);
+}
+.quickdue button:hover{border-color:var(--ink-3);color:var(--ink)}
+.quickdue button:active{background:var(--sunken)}
+@media (hover:none){.quickdue button{padding:12px 16px;min-height:44px}}
+.add-foot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;justify-content:flex-end}
+.add-foot #moreToggle{margin-right:auto}
+.add-foot .hint{color:var(--ink-3);font-size:var(--step--1)}
+@media (hover:none){.add-foot .hint{display:none}}
 
 .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:18px 0 12px}
 .seg{display:flex;background:var(--sunken);border:1px solid var(--line-soft);border-radius:9px;padding:2px;gap:2px;overflow-x:auto}
@@ -275,6 +316,10 @@ textarea.input{resize:vertical;min-height:64px}
 .seg button .n{font-family:"JetBrains Mono",monospace;font-size:.72rem;opacity:.65;margin-left:5px}
 .filters .grow{margin-left:auto;display:flex;gap:8px;align-items:center}
 .search{max-width:210px}
+@media (max-width:760px){
+  .filters .grow{margin-left:0;width:100%}
+  .search{max-width:none;flex:1}
+}
 
 .tasklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .task{
@@ -317,6 +362,15 @@ textarea.input{resize:vertical;min-height:64px}
 .chip-tag::before{content:"#";opacity:.5}
 .t-actions{display:flex;gap:2px;align-self:center;opacity:.45;transition:opacity .14s ease}
 .task:hover .t-actions,.task:focus-within .t-actions{opacity:1}
+@media (hover:none){
+  .t-actions{opacity:1}
+  .iconbtn{min-width:40px;min-height:40px}
+  .check{width:26px;height:26px;position:relative}
+  .check svg{width:15px;height:15px}
+  /* область нажатия шире самой рамки — квадратик остаётся аккуратным */
+  .check::after{content:"";position:absolute;top:-9px;left:-9px;right:-9px;bottom:-9px}
+  .task{gap:9px;padding:13px 8px 13px 0}
+}
 .iconbtn{
   border:0;background:transparent;cursor:pointer;padding:6px;border-radius:6px;
   color:var(--ink-2);display:grid;place-items:center;
@@ -351,20 +405,22 @@ textarea.input{resize:vertical;min-height:64px}
 @media (min-width:860px){.panels.two{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .chart-scroll{overflow-x:auto;padding-bottom:4px}
-.chart-scroll svg{display:block;width:100%;min-width:520px;height:auto}
+.chart-scroll svg{display:block;width:100%;min-width:460px;height:auto}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:var(--step--1);color:var(--ink-2);margin-bottom:10px}
 .legend span{display:flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:3px;display:block}
 
 .bars{display:flex;flex-direction:column;gap:8px;margin:0}
 .bars .b-row{display:grid;grid-template-columns:88px minmax(0,1fr) 46px;align-items:center;gap:10px}
+.bars.short .b-row{grid-template-columns:34px minmax(0,1fr) 40px}
+@media (max-width:520px){.bars .b-row{grid-template-columns:74px minmax(0,1fr) 40px;gap:8px}}
 .bars .b-lab{font-size:var(--step--1);color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bars .b-track{background:var(--sunken);border-radius:5px;height:16px;display:flex;gap:2px;padding:0;overflow:hidden}
 .bars .b-fill{height:100%;border-radius:5px;background:var(--series-b);min-width:2px;flex:none}
 .bars .b-val{font-family:"JetBrains Mono",monospace;font-size:var(--step--1);text-align:right;color:var(--ink-2);font-variant-numeric:tabular-nums}
 
 .hours{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px}
-.hours .h-cell{aspect-ratio:1/1.4;border-radius:3px;background:var(--sunken);cursor:default;box-shadow:inset 0 0 0 1px var(--line-soft)}
+.hours .h-cell{aspect-ratio:1/1.4;min-height:26px;border-radius:3px;background:var(--sunken);cursor:default;box-shadow:inset 0 0 0 1px var(--line-soft)}
 .hours-axis{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px;margin-top:5px;font-family:"JetBrains Mono",monospace;font-size:.58rem;color:var(--ink-3);text-align:center}
 
 .tablewrap{overflow-x:auto;margin-top:12px}
@@ -377,6 +433,9 @@ details.tbl summary:hover{color:var(--ink)}
 
 /* ── Настройки ──────────────────────────────────────────── */
 .setrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+@media (max-width:560px){
+  .setrow{grid-template-columns:minmax(0,1fr);justify-items:start;gap:10px}
+}
 .setrow:last-child{border-bottom:0}
 .setrow h4{margin:0 0 2px;font-size:var(--step-0);font-weight:600}
 .setrow p{margin:0;color:var(--ink-2);font-size:var(--step--1);max-width:56ch;text-wrap:pretty}
@@ -394,7 +453,10 @@ details.tbl summary:hover{color:var(--ink)}
 .status-dot[data-s="off"] i{background:var(--accent)}
 
 /* ── Тосты и подсказка ──────────────────────────────────── */
-#toasts{position:fixed;right:16px;bottom:16px;z-index:90;display:flex;flex-direction:column;gap:8px;max-width:min(340px,calc(100vw - 32px))}
+#toasts{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:90;display:flex;flex-direction:column;gap:8px;max-width:min(340px,calc(100vw - 32px))}
+@media (max-width:760px){
+  #toasts{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));max-width:none}
+}
 .toast{
   background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--accent);
   border-radius:0 10px 10px 0;padding:11px 13px;box-shadow:var(--shadow);
@@ -403,6 +465,13 @@ details.tbl summary:hover{color:var(--ink)}
 .toast b{display:block;font-size:var(--step--1);margin-bottom:2px}
 .toast span{font-size:var(--step--1);color:var(--ink-2)}
 .toast.ok{border-left-color:var(--done)}
+.toast .undo{
+  margin-top:8px;border:1px solid var(--line);background:var(--surface);
+  color:var(--ink);border-radius:7px;padding:7px 13px;cursor:pointer;
+  font-size:var(--step--1);font-weight:500;
+}
+.toast .undo:hover{background:var(--sunken)}
+@media (hover:none){.toast .undo{min-height:44px;padding:11px 16px}}
 @keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 
 #tip{
@@ -431,7 +500,11 @@ details.tbl summary:hover{color:var(--ink)}
     </div>
     <div class="bar-actions">
       <button class="btn btn-icon" id="themeBtn" title="Сменить тему" aria-label="Сменить тему">◐</button>
-      <button class="btn" id="notifBtn">Включить напоминания</button>
+      <button class="btn" id="notifBtn" title="Напоминания">
+        <span class="ico" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8a4 4 0 0 0-4 4v2.6L2.7 11h10.6L12 8.4V5.8a4 4 0 0 0-4-4Z"/><path d="M6.4 13a1.7 1.7 0 0 0 3.2 0"/></svg></span>
+        <span class="dot" aria-hidden="true"></span>
+        <span class="lbl">Включить напоминания</span>
+      </button>
     </div>
   </div>
 </header>
@@ -523,17 +596,23 @@ details.tbl summary:hover{color:var(--ink)}
       </div>
     </div>
 
-    <form class="card" id="addForm" autocomplete="off">
+    <form class="card" id="addForm" autocomplete="off" data-more="0">
       <div class="card-head">
         <h3 id="addTitle">Новое дело</h3>
         <span class="eyebrow" id="editHint" style="margin-left:auto"></span>
       </div>
       <div class="card-body">
+        <div class="field">
+          <label for="fTitle">Что сделать</label>
+          <input class="input" id="fTitle" required maxlength="200" placeholder="Позвонить в автосервис" enterkeyhint="done">
+        </div>
+        <div class="quickdue" id="quickDue">
+          <button type="button" data-q="today">сегодня вечером</button>
+          <button type="button" data-q="tomorrow">завтра утром</button>
+          <button type="button" data-q="week">через неделю</button>
+          <button type="button" data-q="none">без срока</button>
+        </div>
         <div class="add-grid">
-          <div class="field">
-            <label for="fTitle">Что сделать</label>
-            <input class="input" id="fTitle" required maxlength="200" placeholder="Позвонить в автосервис">
-          </div>
           <div class="field">
             <label for="fDue">Когда — срок</label>
             <input class="input mono" id="fDue" type="datetime-local">
@@ -579,6 +658,7 @@ details.tbl summary:hover{color:var(--ink)}
           </div>
         </div>
         <div class="add-foot">
+          <button class="btn btn-ghost" id="moreToggle" type="button" aria-expanded="false" aria-controls="addForm">Подробнее</button>
           <span class="hint">Ctrl + Enter — добавить</span>
           <button class="btn hidden" id="cancelEdit" type="button">Отмена</button>
           <button class="btn btn-primary" type="submit" id="submitBtn">Добавить дело</button>
@@ -1268,7 +1348,17 @@ var ICON_DEL = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strok
 function renderTasks(){
   var c = counts();
   $$('#filterSeg .n').forEach(function(n){ n.textContent = c[n.getAttribute('data-n')] || ''; });
-  $$('#filterSeg button').forEach(function(b){ b.setAttribute('aria-pressed', String(b.getAttribute('data-f') === ui.filter)); });
+  $$('#filterSeg button').forEach(function(b){
+    var on = b.getAttribute('data-f') === ui.filter;
+    b.setAttribute('aria-pressed', String(on));
+    // на узком экране лента фильтров прокручивается — выбранный не должен уехать за край
+    if(on){
+      var seg = b.parentElement;
+      if(b.offsetLeft < seg.scrollLeft || b.offsetLeft + b.offsetWidth > seg.scrollLeft + seg.clientWidth){
+        seg.scrollTo({left: Math.max(0, b.offsetLeft - 12), behavior: prefersReduced() ? 'auto' : 'smooth'});
+      }
+    }
+  });
   $('#cntOpen').textContent = c.open ? c.open : '';
 
   // список тегов
@@ -1440,9 +1530,18 @@ function removeTask(id){
   var i = state.tasks.findIndex(function(x){ return x.id === id; });
   if(i < 0) return;
   if(ui.editing === id) cancelEdit();
+  var gone = state.tasks[i];
   state.tasks.splice(i, 1);
   touch();
   renderAll();
+  toast('Удалено', gone.title, false, {
+    label: 'Вернуть',
+    run: function(){
+      state.tasks.splice(Math.min(i, state.tasks.length), 0, gone);
+      touch();
+      renderAll();
+    }
+  });
 }
 
 /* ── форма добавления / правки ── */
@@ -1463,6 +1562,7 @@ function startEdit(id){
   $('#fTag').value = t.tag;
   $('#fRepeat').value = t.repeat;
   $('#fPre').value = String(t.preMin);
+  setMore(true);
   $('#addTitle').textContent = 'Правим дело';
   $('#editHint').textContent = 'режим правки';
   $('#submitBtn').textContent = 'Сохранить';
@@ -1471,10 +1571,36 @@ function startEdit(id){
   $('#fTitle').focus();
 }
 
+function setMore(open){
+  var f = $('#addForm');
+  f.setAttribute('data-more', open ? '1' : '0');
+  var b = $('#moreToggle');
+  b.setAttribute('aria-expanded', String(!!open));
+  b.textContent = open ? 'Свернуть' : 'Подробнее';
+}
+
+/** Быстрый срок одним нажатием — на телефоне это главный способ. */
+function quickDue(kind){
+  if(kind === 'none'){ $('#fDue').value = ''; return; }
+  var d = new Date();
+  if(kind === 'today'){
+    d.setHours(20, 0, 0, 0);
+    if(d.getTime() <= Date.now()){ d = new Date(Date.now() + 2 * 3600000); d.setMinutes(0, 0, 0); }
+  } else if(kind === 'tomorrow'){
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+  } else if(kind === 'week'){
+    d.setDate(d.getDate() + 7);
+    d.setHours(9, 0, 0, 0);
+  }
+  $('#fDue').value = toLocalInput(d.getTime());
+}
+
 function cancelEdit(){
   ui.editing = null;
   $('#addForm').reset();
   $('#fPre').value = '-1';
+  setMore(false);
   $('#addTitle').textContent = 'Новое дело';
   $('#editHint').textContent = '';
   $('#submitBtn').textContent = 'Добавить дело';
@@ -1525,6 +1651,7 @@ function submitTask(e){
     state.tasks.push(patch);
     $('#addForm').reset();
     $('#fPre').value = '-1';
+    setMore(false);
     $('#fTitle').focus();
     if(ui.filter === 'done') ui.filter = 'open';
   }
@@ -1571,7 +1698,10 @@ function updateNotifUI(){
   else if(Notification.permission === 'granted'){ label = 'Напоминания включены'; mode = 'on'; sLabel = 'разрешены'; }
   else if(Notification.permission === 'denied'){ label = 'Уведомления запрещены'; mode = 'off'; sLabel = 'запрещены в браузере'; }
   else { label = 'Включить напоминания'; mode = ''; sLabel = 'не спрошено'; }
-  btn.textContent = label;
+  $('.lbl', btn).textContent = label;
+  btn.setAttribute('data-s', mode);
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
   btn.disabled = !notifySupported() || Notification.permission !== 'default';
   if(btn2){
     btn2.textContent = mode === 'on' ? 'Проверить' : 'Разрешить';
@@ -1620,11 +1750,20 @@ function fire(title, body, ok){
   beep();
 }
 
-function toast(title, body, ok){
+function toast(title, body, ok, action){
   var box = $('#toasts');
   var t = el('div', 'toast' + (ok ? ' ok' : ''));
   t.appendChild(el('b', null, title));
   t.appendChild(el('span', null, body));
+  if(action){
+    var ab = el('button', 'undo', action.label);
+    ab.type = 'button';
+    ab.addEventListener('click', function(){
+      action.run();
+      if(t.parentNode) t.parentNode.removeChild(t);
+    });
+    t.appendChild(ab);
+  }
   box.appendChild(t);
   setTimeout(function(){
     t.style.transition = 'opacity .3s ease, transform .3s ease';
@@ -1905,10 +2044,7 @@ function drawChart30(S){
     // прозрачная зона наведения на всю группу
     var hit = mk('rect', {x:padL + i * groupW, y:padT, width:groupW, height:innerH, fill:'transparent'});
     hit.style.cursor = 'default';
-    var text = fmtDateShort.format(d.date) + '\nдобавлено: ' + d.created + '\nвыполнено: ' + d.done;
-    hit.addEventListener('mouseenter', function(e){ showTip(e, text); });
-    hit.addEventListener('mousemove', moveTip);
-    hit.addEventListener('mouseleave', hideTip);
+    attachTip(hit, fmtDateShort.format(d.date) + '\nдобавлено: ' + d.created + '\nвыполнено: ' + d.done);
     svg.appendChild(hit);
 
     // подписи оси X — каждый пятый день
@@ -1969,12 +2105,14 @@ function drawTable30(S){
 
 function drawWeekday(S){
   var names = ['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'];
+  var short = ['пн','вт','ср','чт','пт','сб','вс'];
   var max = Math.max(1, Math.max.apply(null, S.weekday));
   var host = $('#weekdayBars');
+  host.className = 'bars short';
   host.textContent = '';
   S.weekday.forEach(function(v, i){
     var row = el('div', 'b-row');
-    row.appendChild(el('dt', 'b-lab', names[i]));
+    row.appendChild(el('dt', 'b-lab', short[i]));
     var track = el('dd', 'b-track');
     track.style.margin = '0';
     var fill = el('div', 'b-fill');
@@ -1984,9 +2122,7 @@ function drawWeekday(S){
     row.appendChild(track);
     row.appendChild(el('dd', 'b-val', String(v)));
     row.lastChild.style.margin = '0';
-    row.addEventListener('mouseenter', function(e){ showTip(e, names[i] + '\nзакрыто дел: ' + v); });
-    row.addEventListener('mousemove', moveTip);
-    row.addEventListener('mouseleave', hideTip);
+    attachTip(row, names[i] + '\nзакрыто дел: ' + v);
     host.appendChild(row);
   });
   var bestIdx = S.weekday.indexOf(max);
@@ -2008,9 +2144,7 @@ function drawHours(S){
       c.style.background = 'var(--done)';
       c.style.opacity = (0.22 + k * 0.78).toFixed(2);
     }
-    c.addEventListener('mouseenter', function(e){ showTip(e, String(h).padStart(2,'0') + ':00 — ' + String((h+1)%24).padStart(2,'0') + ':00\nзакрыто: ' + v); });
-    c.addEventListener('mousemove', moveTip);
-    c.addEventListener('mouseleave', hideTip);
+    attachTip(c, String(h).padStart(2,'0') + ':00 — ' + String((h+1)%24).padStart(2,'0') + ':00\nзакрыто: ' + v);
     grid.appendChild(c);
     var a = el('div', null, h % 3 === 0 ? String(h) : '');
     axis.appendChild(a);
@@ -2051,9 +2185,7 @@ function drawTags(S){
     var val = el('dd', 'b-val', d.done + '/' + d.total);
     val.style.margin = '0';
     row.appendChild(val);
-    row.addEventListener('mouseenter', function(e){ showTip(e, k + '\nвсего: ' + d.total + '\nзакрыто: ' + d.done); });
-    row.addEventListener('mousemove', moveTip);
-    row.addEventListener('mouseleave', hideTip);
+    attachTip(row, k + '\nвсего: ' + d.total + '\nзакрыто: ' + d.done);
     host.appendChild(row);
   });
 }
@@ -2115,7 +2247,21 @@ function drawCross(S){
 }
 
 /* ── общая подсказка для всех графиков ── */
-var tipEl = null;
+var tipEl = null, tipTimer = null;
+
+/** Одна привязка на всё: наведение мышью и касание пальцем. */
+function attachTip(node, text){
+  node.addEventListener('mouseenter', function(e){ showTip(e, text); });
+  node.addEventListener('mousemove', moveTip);
+  node.addEventListener('mouseleave', hideTip);
+  node.addEventListener('pointerdown', function(e){
+    if(e.pointerType === 'mouse') return;
+    showTip(e, text);
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(hideTip, 2200);
+  });
+}
+
 function showTip(e, text){
   tipEl = tipEl || $('#tip');
   tipEl.textContent = text;
@@ -2244,6 +2390,13 @@ function armConfirm(btn, question, action){
 function bind(){
   $('#addForm').addEventListener('submit', submitTask);
   $('#cancelEdit').addEventListener('click', cancelEdit);
+  $('#moreToggle').addEventListener('click', function(){
+    setMore($('#addForm').getAttribute('data-more') !== '1');
+  });
+  $('#quickDue').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-q]');
+    if(b) quickDue(b.getAttribute('data-q'));
+  });
   $('#addForm').addEventListener('keydown', function(e){
     if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
       e.preventDefault();
