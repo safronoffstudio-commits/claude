@@ -56,22 +56,26 @@ set_env WEBHOOK_SECRET "$SECRET"
 
 # --- 5. Деплой ----------------------------------------------------------
 say "4/4 Деплой"
-URL="$($VC deploy --prod --yes | tail -n 1 | tr -d '[:space:]')"
-case "$URL" in
-  https://*) ;;
-  *) die "не удалось получить URL деплоя (получено: '$URL')" ;;
-esac
+DEPLOY_OUT="$($VC deploy --prod --yes)"
+# CLI может печатать несколько строк — забираем последний https-адрес
+URL="$(printf '%s\n' "$DEPLOY_OUT" | grep -oE 'https://[A-Za-z0-9._-]+' | tail -n 1)"
+[ -n "$URL" ] || die "не удалось вычленить URL деплоя из вывода:
+$DEPLOY_OUT"
 echo "  $URL"
 
 # --- 6. Вебхук ----------------------------------------------------------
 say "Прописываю вебхук"
-RESP="$(curl -fsS "$URL/api/setup?key=$SECRET")" || die "не удалось вызвать /api/setup — проверь URL и секрет"
+RESP="$(curl -fsS "$URL/api/setup?key=$SECRET")" || die "не удалось вызвать /api/setup.
+Проверь диагностику: $URL/api/diag?key=$SECRET"
 echo "$RESP"
 
 case "$RESP" in
   *'"ok":true'*)
     say "Готово. Открывай бота и жми /start"
     echo "Лендинг: $URL"
+    echo
+    echo "Если бот молчит — открой диагностику:"
+    echo "  $URL/api/diag?key=$SECRET"
     echo
     echo "Осталось вручную у @BotFather (по желанию):"
     echo "  /setinline — включить inline-режим, чтобы бот работал в любом чате"
