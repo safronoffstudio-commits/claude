@@ -8,7 +8,10 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';
-const CSS = 'https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=PT+Sans:wght@400;700&display=swap';
+// URL шрифтов берём из самой вёрстки, чтобы превью не разъезжалось с страницей
+const CSS = (readFileSync('index.art.html', 'utf8')
+  .match(/href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"/) || [])[1];
+if (!CSS) throw new Error('в index.art.html не найдена ссылка на Google Fonts');
 
 function inlinedFontCss() {
   let css = execFileSync('curl', ['-sS', '-m', '30', '-A', UA, CSS], { encoding: 'utf8' });
@@ -54,26 +57,14 @@ await page.screenshot({ path: 'out/page.png', fullPage: true });
 
 const save = async (label) => {
   const src = await page.getAttribute('#meme', 'src');
-  writeFileSync(`out/${label}.png`, Buffer.from(src.split(',')[1], 'base64'));
-  return (await page.getAttribute('#meme', 'alt')).slice(0, 52);
-};
-const pick = async (chip) => {
-  for (const c of await page.$$('.chip')) {
-    if ((await c.textContent()).trim() === chip) { await c.click(); break; }
-  }
-  await page.waitForTimeout(350);
+  const ext = src.slice(11, src.indexOf(';'));
+  writeFileSync(`out/${label}.${ext}`, Buffer.from(src.split(',')[1], 'base64'));
+  return (await page.getAttribute('#meme', 'alt')).replace('Мем в стиле старой аватарки. Подпись: ', '');
 };
 
-await pick('Справки');
-console.log('cert   :', await save('cert'));
-await pick('Все');
-const kinds = { 'ПРАВИЛА': 'rules', 'УРОВНИ': 'levels' };
-const seen = {};
-for (let i = 0; i < 18 && Object.keys(seen).length < 3; i++) {
-  await page.waitForTimeout(220);
-  const alt = await page.getAttribute('#meme', 'alt');
-  const k = kinds[alt.split(' ')[0]] || 'dialog';
-  if (!seen[k]) { seen[k] = true; console.log(k.padEnd(7), ':', await save(k)); }
+for (let i = 1; i <= 4; i++) {
+  await page.waitForTimeout(260);
+  console.log('кадр ' + i + ':', await save('shot' + i));
   await page.click('#go');
 }
 

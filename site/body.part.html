@@ -2,30 +2,35 @@
   <div class="strip" aria-hidden="true"></div>
 
   <h1>Вацок-генератор</h1>
-  <p class="lead">Мемы про хинкал, гостеприимство, борьбу и родню.
-  Жми кнопку — получишь картинку. Зажми картинку — сохранишь.</p>
+  <p class="lead">Аватарка как в две тысячи десятом: ковровая рамка, виньетка
+  и подпись с многоточием. Поставь своё фото — станет совсем как надо.</p>
 
   <p class="eyebrow" id="catLabel">Тема</p>
   <ul class="chips" id="chips" role="group" aria-labelledby="catLabel"></ul>
 
   <figure>
-    <div class="frame">
-      <img id="meme" class="fade" alt="Мем про дагестанское гостеприимство" width="1080" height="1080">
+    <div class="shot">
+      <img id="meme" class="fade" alt="Мем в стиле старой аватарки" width="1080" height="1080">
     </div>
     <figcaption id="cap">Зажми картинку и выбери «Сохранить изображение».</figcaption>
   </figure>
 
-  <button class="go" id="go" type="button">Ещё мем</button>
+  <button class="go" id="go" type="button">Ещё подпись</button>
+
+  <div class="tools">
+    <input id="photo" type="file" accept="image/*" class="vh">
+    <label class="btn" for="photo" id="photoBtn">Своё фото</label>
+    <button class="btn" id="clear" type="button" hidden>Убрать фото</button>
+  </div>
 
   <div class="field">
-    <label for="name">Имя для справки</label>
-    <input id="name" type="text" maxlength="18" autocomplete="off"
-           spellcheck="false" placeholder="Вацок" value="">
+    <label class="lbl" for="own">Своя подпись</label>
+    <input id="own" type="text" maxlength="70" autocomplete="off" placeholder="Хинкал остыл...">
   </div>
-  <p class="hint">Подставляется в «Справки» — выбери эту тему выше.</p>
+  <p class="hint">Многоточие в конце — обязательно. Так положено.</p>
 
   <footer>
-    Юмор про своих: еда, родня, свадьбы, серпантины и спортзал.
-    Ничего обидного — только то, над чем смеются сами.
+    Фото никуда не уходит: всё рисуется прямо в твоём браузере.<br>
+    Юмор про своих — еда, родня, свадьбы, серпантины и ковёр в зале.
   </footer>
 </div>
