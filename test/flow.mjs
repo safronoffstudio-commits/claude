@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { generateMeme, memeToText } from '../lib/memes.js';
 import { newSeed } from '../lib/rng.js';
-import { memeImageUrl, baseUrl, readUpdate } from '../lib/telegram.js';
+import { memeImageUrl, baseUrl, readUpdate, authorize } from '../lib/telegram.js';
 import { Readable } from 'node:stream';
 
 let checks = 0;
@@ -96,4 +96,27 @@ for (const bad of ['', '   ', '/start лишнее', 'а'.repeat(500), '@user д
   assert.ok(m.title && m.punch, 'сломался на вводе: ' + JSON.stringify(bad.slice(0, 20)));
 }
 console.log('грязный ввод обрабатывается');
+// Служебные ручки пускают по секрету или по токену бота, и никак иначе.
+{
+  const oldT = process.env.TELEGRAM_BOT_TOKEN, oldS = process.env.WEBHOOK_SECRET;
+  process.env.TELEGRAM_BOT_TOKEN = '111:AAtok';
+  process.env.WEBHOOK_SECRET = 'sekret';
+  const get = (q) => ({ url: '/api/setup' + q, method: 'GET' });
+  const post = (o) => {
+    const st = Readable.from([Buffer.from(JSON.stringify(o))]);
+    st.url = '/api/setup'; st.method = 'POST';
+    return st;
+  };
+  assert.equal(await authorize(get('?token=111:AAtok')), true);
+  assert.equal(await authorize(get('?key=sekret')), true);
+  assert.equal(await authorize(post({ token: '111:AAtok' })), true);
+  assert.equal(await authorize(post({ key: 'sekret' })), true);
+  for (const bad of [get(''), get('?token=nope'), get('?key=nope')]) {
+    assert.equal(await authorize(bad), false, 'пустил лишнего');
+  }
+  assert.equal(await authorize(post({})), false, 'пустил лишнего');
+  process.env.TELEGRAM_BOT_TOKEN = oldT; process.env.WEBHOOK_SECRET = oldS;
+  console.log('доступ к /api/setup и /api/diag: только по токену или секрету');
+}
+
 console.log('\nВСЕ ПРОВЕРКИ ПРОЙДЕНЫ');

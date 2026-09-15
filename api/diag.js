@@ -1,6 +1,8 @@
-// Диагностика: /api/diag  — короткий отчёт без секретов
-//               /api/diag?key=<WEBHOOK_SECRET> — полный, с ошибкой вебхука от Telegram
-import { tg, baseUrl } from '../lib/telegram.js';
+// Диагностика.
+//   /api/diag                      — короткий отчёт, без секретов
+//   /api/diag?token=<токен бота>   — полный, с ошибкой доставки от Telegram
+//   /api/diag?key=<WEBHOOK_SECRET> — то же самое
+import { tg, baseUrl, authorize } from '../lib/telegram.js';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = process.env.WEBHOOK_SECRET;
@@ -12,22 +14,24 @@ export default async function handler(req, res) {
 
   // 1. Переменные окружения
   add(!!TOKEN, 'TELEGRAM_BOT_TOKEN', TOKEN ? 'задан' : 'НЕ ЗАДАН — добавь в Vercel → Settings → Environment Variables и сделай Redeploy');
-  add(!!SECRET, 'WEBHOOK_SECRET', SECRET ? 'задан' : 'НЕ ЗАДАН — без него не открыть /api/setup');
+  add(true, 'WEBHOOK_SECRET', SECRET
+    ? 'задан, вебхук защищён'
+    : 'не задан — бот работать будет, но вебхук примет POST от кого угодно. Стоит завести.');
 
-  const key = new URL(req.url, 'http://x').searchParams.get('key');
-  const full = !!SECRET && key === SECRET;
+  const full = await authorize(req);
 
-  if (!TOKEN || !SECRET) {
+  if (!TOKEN) {
     return res.status(200).json({
-      итог: 'Не хватает переменных окружения',
+      итог: 'TELEGRAM_BOT_TOKEN не задан — без него бот работать не может',
       шаги: steps,
-      что_делать: 'Добавь недостающие переменные в Vercel (Production), нажми Redeploy, потом открой /api/setup?key=<секрет>',
+      что_делать: 'Vercel → Settings → Environment Variables → добавить TELEGRAM_BOT_TOKEN, '
+        + 'затем Deployments → Redeploy, затем открыть /api/setup?token=<токен бота>',
     });
   }
 
   if (!full) {
     return res.status(200).json({
-      итог: 'Переменные на месте. Для полного отчёта открой /api/diag?key=<WEBHOOK_SECRET>',
+      итог: 'Для полного отчёта добавь к ссылке ?token=<токен бота>',
       шаги: steps,
     });
   }
@@ -48,9 +52,10 @@ export default async function handler(req, res) {
       info = await tg(TOKEN, 'getWebhookInfo', {});
       const want = base + '/api/telegram';
       if (!info.url) {
-        add(false, 'Вебхук', 'НЕ ПРОПИСАН — открой /api/setup?key=<секрет>');
+        add(false, 'Вебхук', 'НЕ ПРОПИСАН — открой /api/setup?token=<токен бота>');
       } else if (info.url !== want) {
-        add(false, 'Вебхук', 'смотрит на ' + info.url + ', а деплой живёт на ' + want + ' — открой /api/setup?key=<секрет>');
+        add(false, 'Вебхук', 'смотрит на ' + info.url + ', а деплой живёт на ' + want
+          + ' — открой /api/setup?token=<токен бота>');
       } else {
         add(true, 'Вебхук', 'прописан верно: ' + info.url);
       }
