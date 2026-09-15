@@ -1,6 +1,6 @@
 import { generateMeme, memeToText } from '../lib/memes.js';
 import { newSeed } from '../lib/rng.js';
-import { tg, baseUrl, memeImageUrl, moreKeyboard } from '../lib/telegram.js';
+import { tg, baseUrl, memeImageUrl, moreKeyboard, readUpdate } from '../lib/telegram.js';
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const SECRET = process.env.WEBHOOK_SECRET;
@@ -144,7 +144,14 @@ async function handleInline(q, base) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(200).json({ ok: true, hint: 'это вебхук для Telegram' });
+    // Если ты видишь это в браузере — функция жива и деплой открыт наружу.
+    return res.status(200).json({
+      ok: true,
+      это: 'вебхук для Telegram, сюда ходит только Telegram методом POST',
+      token_задан: !!TOKEN,
+      secret_задан: !!SECRET,
+      диагностика: '/api/diag',
+    });
   }
   if (!TOKEN) {
     console.error('TELEGRAM_BOT_TOKEN не задан');
@@ -154,13 +161,14 @@ export default async function handler(req, res) {
     return res.status(401).json({ ok: false });
   }
 
-  const update = req.body || {};
+  const update = await readUpdate(req);
   const base = baseUrl(req);
 
   try {
     if (update.message) await handleMessage(update.message, base);
     else if (update.callback_query) await handleCallback(update.callback_query, base);
     else if (update.inline_query) await handleInline(update.inline_query, base);
+    else console.warn('апдейт без message/callback_query/inline_query:', Object.keys(update).join(','));
   } catch (err) {
     // Telegram повторяет апдейт при не-200 — отвечаем 200 всегда.
     console.error('ошибка обработки апдейта:', err?.message || err);

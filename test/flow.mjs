@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { generateMeme, memeToText } from '../lib/memes.js';
 import { newSeed } from '../lib/rng.js';
-import { memeImageUrl, baseUrl } from '../lib/telegram.js';
+import { memeImageUrl, baseUrl, readUpdate } from '../lib/telegram.js';
+import { Readable } from 'node:stream';
 
 let checks = 0;
 const fail = [];
@@ -74,6 +75,20 @@ console.log('текстовый фолбэк валиден');
 assert.equal(baseUrl({ headers: { 'x-forwarded-host': 'a.vercel.app', 'x-forwarded-proto': 'https' } }), 'https://a.vercel.app');
 assert.equal(baseUrl({ headers: { host: 'b.vercel.app' } }), 'https://b.vercel.app');
 console.log('baseUrl определяется верно');
+
+// Тело апдейта может прийти объектом, строкой, буфером или непрочитанным потоком.
+// Потерять его нельзя: Telegram получит 200 и не покажет никакой ошибки,
+// а бот со стороны будет выглядеть мёртвым.
+{
+  const upd = { message: { chat: { id: 1 }, text: '/start' } };
+  const raw = JSON.stringify(upd);
+  assert.deepEqual(await readUpdate({ body: upd }), upd, 'объект');
+  assert.deepEqual(await readUpdate({ body: raw }), upd, 'строка');
+  assert.deepEqual(await readUpdate({ body: Buffer.from(raw) }), upd, 'буфер');
+  assert.deepEqual(await readUpdate(Readable.from([Buffer.from(raw)])), upd, 'поток');
+  assert.deepEqual(await readUpdate({ body: 'не json' }), {}, 'мусор не роняет обработчик');
+  console.log('разбор тела апдейта: объект/строка/буфер/поток/мусор');
+}
 
 // длинный/грязный ввод не ломает генератор
 for (const bad of ['', '   ', '/start лишнее', 'а'.repeat(500), '@user до цели', '\n\n\t']) {
