@@ -1,0 +1,74 @@
+<title>Вацок-генератор</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=PT+Sans:wght@400;700&display=swap">
+<style>
+  :root{
+    --ground:#EFE6D4; --panel:#FBF6EC; --ink:#241F33; --muted:#6C6484;
+    --madder:#A8322A; --saffron:#9C6A0E; --indigo:#2E4A6B;
+    --line:rgba(36,31,51,.16); --chip:#FFFFFF; --focus:#A8322A;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#14111F; --panel:#1E1A2E; --ink:#EFE6D4; --muted:#9E96B4;
+      --madder:#D4574B; --saffron:#E0A32E; --indigo:#7B9CC4;
+      --line:rgba(239,230,212,.16); --chip:#251F38; --focus:#E0A32E;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#14111F; --panel:#1E1A2E; --ink:#EFE6D4; --muted:#9E96B4;
+    --madder:#D4574B; --saffron:#E0A32E; --indigo:#7B9CC4;
+    --line:rgba(239,230,212,.16); --chip:#251F38; --focus:#E0A32E;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font:400 16px/1.6 "PT Sans", system-ui, sans-serif;
+  }
+  .wrap{max-width:600px; margin:0 auto; padding-block:0 56px; padding-left:18px; padding-right:18px}
+
+  /* Ковровая полоса-заставка: тот же мотив, что и в рамке мема */
+  .strip{height:22px; margin:0 -18px 26px;
+    background:
+      repeating-linear-gradient(90deg,
+        var(--madder) 0 14px, transparent 14px 28px),
+      repeating-linear-gradient(90deg,
+        var(--indigo) 0 28px, var(--saffron) 28px 56px);
+  }
+
+  h1{font:700 clamp(30px,8vw,42px)/1.05 Oswald, "Arial Narrow", sans-serif;
+     margin:0 0 10px; letter-spacing:.5px; text-wrap:balance; text-transform:uppercase}
+  .lead{color:var(--muted); margin:0 0 26px; max-width:46ch}
+
+  .eyebrow{font:600 12px/1 Oswald, sans-serif; letter-spacing:2.4px;
+    text-transform:uppercase; color:var(--madder); margin:0 0 10px}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 22px; padding:0; list-style:none}
+  .chip{font:600 14px/1 Oswald, sans-serif; letter-spacing:.6px; text-transform:uppercase;
+    background:var(--chip); color:var(--ink); border:1px solid var(--line);
+    padding:11px 14px; border-radius:2px; cursor:pointer}
+  .chip[aria-pressed="true"]{background:var(--madder); border-color:var(--madder); color:#FBF6EC}
+  .chip:focus-visible, .go:focus-visible, #name:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
+
+  figure{margin:0 0 16px}
+  .frame{background:#1E1A2E; border:1px solid var(--line); aspect-ratio:1/1; overflow:hidden}
+  .frame img{display:block; width:100%; height:auto; max-width:100%}
+  .fade{opacity:0; transition:opacity .28s ease}
+  .fade.in{opacity:1}
+  @media (prefers-reduced-motion: reduce){ .fade{transition:none} }
+  figcaption{color:var(--muted); font-size:14px; margin-top:10px}
+
+  .go{display:block; width:100%; font:700 20px/1 Oswald, sans-serif; letter-spacing:1.4px;
+    text-transform:uppercase; color:#FBF6EC; background:var(--madder);
+    border:none; border-radius:2px; padding:20px; cursor:pointer; margin:0 0 26px}
+  .go:active{transform:translateY(1px)}
+
+  .field{display:flex; flex-direction:column; gap:8px; margin:0 0 8px}
+  label{font:600 12px/1 Oswald, sans-serif; letter-spacing:2.4px;
+    text-transform:uppercase; color:var(--muted)}
+  #name{font:400 17px "PT Sans", sans-serif; color:var(--ink); background:var(--panel);
+    border:1px solid var(--line); border-radius:2px; padding:14px}
+  .hint{color:var(--muted); font-size:14px; margin:6px 0 0}
+  footer{margin-top:40px; padding-top:20px; border-top:1px solid var(--line);
+    color:var(--muted); font-size:13px; line-height:1.7}
+</style>

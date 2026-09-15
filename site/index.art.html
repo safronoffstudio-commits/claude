@@ -1,0 +1,396 @@
+<title>Вацок-генератор</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=PT+Sans:wght@400;700&display=swap">
+<style>
+  :root{
+    --ground:#EFE6D4; --panel:#FBF6EC; --ink:#241F33; --muted:#6C6484;
+    --madder:#A8322A; --saffron:#9C6A0E; --indigo:#2E4A6B;
+    --line:rgba(36,31,51,.16); --chip:#FFFFFF; --focus:#A8322A;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#14111F; --panel:#1E1A2E; --ink:#EFE6D4; --muted:#9E96B4;
+      --madder:#D4574B; --saffron:#E0A32E; --indigo:#7B9CC4;
+      --line:rgba(239,230,212,.16); --chip:#251F38; --focus:#E0A32E;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#14111F; --panel:#1E1A2E; --ink:#EFE6D4; --muted:#9E96B4;
+    --madder:#D4574B; --saffron:#E0A32E; --indigo:#7B9CC4;
+    --line:rgba(239,230,212,.16); --chip:#251F38; --focus:#E0A32E;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font:400 16px/1.6 "PT Sans", system-ui, sans-serif;
+  }
+  .wrap{max-width:600px; margin:0 auto; padding-block:0 56px; padding-left:18px; padding-right:18px}
+
+  /* Ковровая полоса-заставка: тот же мотив, что и в рамке мема */
+  .strip{height:22px; margin:0 -18px 26px;
+    background:
+      repeating-linear-gradient(90deg,
+        var(--madder) 0 14px, transparent 14px 28px),
+      repeating-linear-gradient(90deg,
+        var(--indigo) 0 28px, var(--saffron) 28px 56px);
+  }
+
+  h1{font:700 clamp(30px,8vw,42px)/1.05 Oswald, "Arial Narrow", sans-serif;
+     margin:0 0 10px; letter-spacing:.5px; text-wrap:balance; text-transform:uppercase}
+  .lead{color:var(--muted); margin:0 0 26px; max-width:46ch}
+
+  .eyebrow{font:600 12px/1 Oswald, sans-serif; letter-spacing:2.4px;
+    text-transform:uppercase; color:var(--madder); margin:0 0 10px}
+
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 22px; padding:0; list-style:none}
+  .chip{font:600 14px/1 Oswald, sans-serif; letter-spacing:.6px; text-transform:uppercase;
+    background:var(--chip); color:var(--ink); border:1px solid var(--line);
+    padding:11px 14px; border-radius:2px; cursor:pointer}
+  .chip[aria-pressed="true"]{background:var(--madder); border-color:var(--madder); color:#FBF6EC}
+  .chip:focus-visible, .go:focus-visible, #name:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
+
+  figure{margin:0 0 16px}
+  .frame{background:#1E1A2E; border:1px solid var(--line); aspect-ratio:1/1; overflow:hidden}
+  .frame img{display:block; width:100%; height:auto; max-width:100%}
+  .fade{opacity:0; transition:opacity .28s ease}
+  .fade.in{opacity:1}
+  @media (prefers-reduced-motion: reduce){ .fade{transition:none} }
+  figcaption{color:var(--muted); font-size:14px; margin-top:10px}
+
+  .go{display:block; width:100%; font:700 20px/1 Oswald, sans-serif; letter-spacing:1.4px;
+    text-transform:uppercase; color:#FBF6EC; background:var(--madder);
+    border:none; border-radius:2px; padding:20px; cursor:pointer; margin:0 0 26px}
+  .go:active{transform:translateY(1px)}
+
+  .field{display:flex; flex-direction:column; gap:8px; margin:0 0 8px}
+  label{font:600 12px/1 Oswald, sans-serif; letter-spacing:2.4px;
+    text-transform:uppercase; color:var(--muted)}
+  #name{font:400 17px "PT Sans", sans-serif; color:var(--ink); background:var(--panel);
+    border:1px solid var(--line); border-radius:2px; padding:14px}
+  .hint{color:var(--muted); font-size:14px; margin:6px 0 0}
+  footer{margin-top:40px; padding-top:20px; border-top:1px solid var(--line);
+    color:var(--muted); font-size:13px; line-height:1.7}
+</style>
+
+<div class="wrap">
+  <div class="strip" aria-hidden="true"></div>
+
+  <h1>Вацок-генератор</h1>
+  <p class="lead">Мемы про хинкал, гостеприимство, борьбу и родню.
+  Жми кнопку — получишь картинку. Зажми картинку — сохранишь.</p>
+
+  <p class="eyebrow" id="catLabel">Тема</p>
+  <ul class="chips" id="chips" role="group" aria-labelledby="catLabel"></ul>
+
+  <figure>
+    <div class="frame">
+      <img id="meme" class="fade" alt="Мем про дагестанское гостеприимство" width="1080" height="1080">
+    </div>
+    <figcaption id="cap">Зажми картинку и выбери «Сохранить изображение».</figcaption>
+  </figure>
+
+  <button class="go" id="go" type="button">Ещё мем</button>
+
+  <div class="field">
+    <label for="name">Имя для справки</label>
+    <input id="name" type="text" maxlength="18" autocomplete="off"
+           spellcheck="false" placeholder="Вацок" value="">
+  </div>
+  <p class="hint">Подставляется в «Справки» — выбери эту тему выше.</p>
+
+  <footer>
+    Юмор про своих: еда, родня, свадьбы, серпантины и спортзал.
+    Ничего обидного — только то, над чем смеются сами.
+  </footer>
+</div>
+
+<script>
+// Контент: тёплый «свой» юмор — тот, что дагестанцы травят про себя сами.
+const MEMES = [
+  // --- ПРАВИЛА ---
+  {k:'rules',c:'Гостеприимство',t:'ПРАВИЛА ВИЗИТА',r:['Зашёл на пять минут','Поел','Поел ещё раз','Остался ночевать'],p:'Голодным из дома не выходят.'},
+  {k:'rules',c:'Еда',t:'ПРАВИЛА ХИНКАЛА',r:['Тесто отдельно','Мясо отдельно','Бульон отдельно','Чеснок — не отдельно'],p:'Кто смешал всё в одной тарелке — тот гость.'},
+  {k:'rules',c:'Борьба',t:'ПРАВИЛА ЗАЛА',r:['В зале двести человек','Из них сто девяносто борцы','Оставшиеся десять тоже борцы','Просто пока молчат'],p:'Ты шёл на фитнес. Тебя записали в вольную.'},
+  {k:'rules',c:'Свадьба',t:'ПРАВИЛА СВАДЬБЫ',r:['Пригласили двести','Пришло восемьсот','Знакомых из них сорок','Танцуешь со всеми'],p:'Остальных зовёшь «вацок». Работает.'},
+  {k:'rules',c:'Дорога',t:'ПРАВИЛА СЕРПАНТИНА',r:['Поворот','Ещё поворот','Отара овец','Ещё сорок поворотов'],p:'Навигатор сдался на третьем.'},
+  {k:'rules',c:'Гостеприимство',t:'ПРАВИЛА ЧАЕПИТИЯ',r:['«Мне только чай»','Принесли чай','И чуду','И суп, и второе, и абрикосы'],p:'Чай был. Формально ты не соврал.'},
+  {k:'rules',c:'Родня',t:'ПРАВИЛА ЗНАКОМСТВА',r:['Спросили, чей ты','Назвал село','Нашли общего дядю','Теперь вы родственники'],p:'Две минуты — и ты уже свой.'},
+  {k:'rules',c:'Еда',t:'ПРАВИЛА УРБЕЧА',r:['Ложка урбеча','Ложка мёда','Размешать','Съесть всю банку'],p:'Никто не останавливался на второй ложке.'},
+
+  // --- УРОВНИ ---
+  {k:'levels',c:'Родня',t:'УРОВНИ РОДСТВА',r:['Родной брат — брат','Двоюродный — брат','Сын соседа — брат','Вацок из зала — брат'],p:'Система простая. Сбоев не давала.'},
+  {k:'levels',c:'Еда',t:'УРОВНИ СЫТОСТИ',r:['Первая тарелка — разминка','Вторая — основная','Третья — из уважения','Четвёртая — «сядь, куда ты»'],p:'Отказ не предусмотрен.'},
+  {k:'levels',c:'Традиции',t:'УРОВНИ УВАЖЕНИЯ',r:['Поздоровался','Встал, когда вошёл старший','Довёз до дома','Денег не взял'],p:'Последний уровень открывает звание «вацок».'},
+  {k:'levels',c:'Дорога',t:'УРОВНИ ТОНИРОВКИ',r:['Задние стёкла — база','Передние — уверенность','Лобовое — характер','Фары — уже искусство'],p:'Видимость ноль. Настроение сто.'},
+  {k:'levels',c:'Гостеприимство',t:'УРОВНИ ПРИЁМА',r:['Накрыл стол','Накрыл второй раз','Не отпустил','Собрал с собой пакет'],p:'Ты уезжаешь с пакетом. Всегда.'},
+  {k:'levels',c:'Борьба',t:'УРОВНИ ПОДГОТОВКИ',r:['Зарядка','Кросс по горе','Ковёр','Дядя показал приём'],p:'Дядя был чемпионом. Все дяди были чемпионами.'},
+  {k:'levels',c:'Еда',t:'УРОВНИ ЧУДУ',r:['С творогом','С мясом','С зеленью','С тыквой'],p:'Правильный ответ — все четыре.'},
+  {k:'levels',c:'Свадьба',t:'УРОВНИ ЛЕЗГИНКИ',r:['Хлопаешь','Вышел в круг','Пошёл на носках','Круг хлопает тебе'],p:'Обратной дороги нет.'},
+
+  // --- ДИАЛОГИ ---
+  {k:'dialog',c:'Еда',t:'ЗА СТОЛОМ',r:['— Я не голодный.','— Садись ешь.'],p:'Разговор окончен.'},
+  {k:'dialog',c:'Гостеприимство',t:'НА ПОРОГЕ',r:['— Я буквально на пять минут.','— Ночуешь здесь.'],p:'Пять минут длились до утра.'},
+  {k:'dialog',c:'Еда',t:'ПОСЛЕДНЯЯ ТАРЕЛКА',r:['— Всё, больше не могу.','— Последнюю положу.'],p:'Она была не последняя.'},
+  {k:'dialog',c:'Родня',t:'КТО ЭТО',r:['— Кто это?','— Брат.','— Какой брат?','— Брат.'],p:'Дополнительных вопросов не поступило.'},
+  {k:'dialog',c:'Гостеприимство',t:'СЧЁТ',r:['— Сколько с меня?','— Ты меня обидеть хочешь?'],p:'Кошелёк убран. Навсегда.'},
+  {k:'dialog',c:'Борьба',t:'ЗАНИМАЕШЬСЯ?',r:['— Спортом занимаешься?','— Так, немного.'],p:'«Немного» — это мастер спорта.'},
+  {k:'dialog',c:'Дорога',t:'ДАЛЕКО ЕХАТЬ',r:['— Далеко ехать?','— Два часа.'],p:'Пятый час. «Почти приехали».'},
+  {k:'dialog',c:'Еда',t:'НИЧЕГО ОСОБЕННОГО',r:['— Что приготовила?','— Так, ничего особенного.'],p:'На столе одиннадцать блюд.'},
+
+  {k:'rules',c:'Традиции',t:'ПРАВИЛА ЗА СТОЛОМ',r:['Старший сел','Потом садятся все','Старший начал','Потом начинают все'],p:'Порядок не обсуждается.'},
+  {k:'dialog',c:'Традиции',t:'СТАРШИЙ ВОШЁЛ',r:['— Сиди, сиди.','— Уже стою.'],p:'Встал раньше, чем услышал.'},
+  {k:'rules',c:'Свадьба',t:'ПРАВИЛА ТАНЦА',r:['Вышел в круг','Держи спину','Руки как надо','Не смотри под ноги'],p:'Под ноги смотрят только гости.'},
+
+  // --- СПРАВКИ (подставляется имя) ---
+  {k:'cert',c:'Справки',t:'СПРАВКА',d:'Отказ от третьей тарелки хинкала',s:'НЕ ЗАСЧИТАНО',p:'Тарелка уже налита.'},
+  {k:'cert',c:'Справки',t:'СПРАВКА',d:'Попытка заплатить за стол',s:'ПРЕСЕЧЕНО',p:'Официант даже не подошёл.'},
+  {k:'cert',c:'Справки',t:'СПРАВКА',d:'Заявление: «я на пять минут»',s:'ФАКТИЧЕСКИ: 6 Ч 40 МИН',p:'Погрешность в пределах нормы.'},
+  {k:'cert',c:'Справки',t:'ДИПЛОМ',d:'Выход в круг на лезгинку',s:'ОЦЕНКА: СТАРАЛСЯ',p:'Круг оценил старание.'},
+  {k:'cert',c:'Справки',t:'СЕРТИФИКАТ',d:'Отказ взять деньги за дорогу',s:'ЗВАНИЕ: ВАЦОК',p:'Звание пожизненное.'},
+  {k:'cert',c:'Справки',t:'СПРАВКА',d:'Банка урбеча за один вечер',s:'ОЖИДАЕМО',p:'Рекорд не побит, но повторён.'},
+];
+
+(function () {
+  var W = 1080, H = 1080, B = 78, PAD = B + 54, CW = W - 2 * PAD;
+  var CV = { ground:'#1E1A2E', madder:'#A8322A', saffron:'#E0A32E',
+             wool:'#EFE6D4', indigo:'#2E4A6B', dim:'#8F87A6' };
+  var FD = function (w, s) { return w + ' ' + s + 'px Oswald, "Arial Narrow", sans-serif'; };
+  var FB = function (w, s) { return w + ' ' + s + 'px "PT Sans", system-ui, sans-serif'; };
+
+  var cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  var x = cv.getContext('2d');
+
+  // --- вспомогательное ---
+  function wrap(text, maxW) {
+    var words = String(text).split(' '), lines = [], cur = '';
+    for (var i = 0; i < words.length; i++) {
+      var t = cur ? cur + ' ' + words[i] : words[i];
+      if (x.measureText(t).width <= maxW || !cur) cur = t;
+      else { lines.push(cur); cur = words[i]; }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function fit(text, maxW, start, min, weight) {
+    var s = start;
+    for (; s > min; s -= 2) { x.font = FD(weight, s); if (x.measureText(text).width <= maxW) break; }
+    x.font = FD(weight, s);
+    return s;
+  }
+  function tracked(text, px, py, sp) {
+    var cx = px;
+    for (var i = 0; i < text.length; i++) {
+      x.fillText(text[i], cx, py);
+      cx += x.measureText(text[i]).width + sp;
+    }
+  }
+
+  // --- ковровая рамка: ступенчатые ромбы с крючками ---
+  function motif(cx, cy, r) {
+    function dia(rr, fill) {
+      x.beginPath();
+      x.moveTo(cx, cy - rr); x.lineTo(cx + rr, cy);
+      x.lineTo(cx, cy + rr); x.lineTo(cx - rr, cy);
+      x.closePath(); x.fillStyle = fill; x.fill();
+    }
+    dia(r, CV.wool); dia(r * 0.62, CV.indigo); dia(r * 0.26, CV.saffron);
+    var h = r * 0.3;
+    x.fillStyle = CV.wool;
+    x.fillRect(cx - h / 2, cy - r - h / 2, h, h);
+    x.fillRect(cx - h / 2, cy + r - h / 2, h, h);
+    x.fillRect(cx - r - h / 2, cy - h / 2, h, h);
+    x.fillRect(cx + r - h / 2, cy - h / 2, h, h);
+  }
+  function border() {
+    x.fillStyle = CV.madder; x.fillRect(0, 0, W, H);
+    x.fillStyle = CV.ground; x.fillRect(B, B, W - 2 * B, H - 2 * B);
+    var r = B * 0.3, n = 12, sx = W / n, i;
+    for (i = 0; i < n; i++) { var c = sx * (i + 0.5); motif(c, B / 2, r); motif(c, H - B / 2, r); }
+    var m = Math.round((H - 2 * B) / sx), sy = (H - 2 * B) / m;
+    for (i = 0; i < m; i++) { var cc = B + sy * (i + 0.5); motif(B / 2, cc, r); motif(W - B / 2, cc, r); }
+    x.strokeStyle = CV.saffron; x.lineWidth = 3;
+    x.strokeRect(B + 13, B + 13, W - 2 * B - 26, H - 2 * B - 26);
+  }
+
+  // --- шапка и подвал ---
+  function header(m) {
+    var y = PAD + 14;
+    x.textBaseline = 'alphabetic';
+    x.fillStyle = CV.saffron; x.font = FD(600, 24);
+    tracked(m.k === 'cert' ? 'ОФИЦИАЛЬНЫЙ ДОКУМЕНТ' : m.c.toUpperCase(), PAD, y, 3.5);
+    y += 46;
+    var s = fit(m.t, CW, 76, 42, 700);
+    x.fillStyle = CV.wool; x.font = FD(700, s);
+    x.fillText(m.t, PAD, y + s * 0.76);
+    y += s * 0.95 + 18;
+    x.fillStyle = CV.madder; x.fillRect(PAD, y, 110, 5);
+    return y + 46;
+  }
+  function footer(m) {
+    x.font = FD(700, 42);
+    var lines = wrap(m.p, CW);
+    if (lines.length > 2) { x.font = FD(700, 34); lines = wrap(m.p, CW); }
+    var lh = 50, y = H - PAD - 28 - (lines.length - 1) * lh;
+    x.fillStyle = CV.saffron;
+    for (var i = 0; i < lines.length; i++) x.fillText(lines[i], PAD, y + i * lh);
+    x.font = FB(400, 19); x.fillStyle = CV.dim;
+    var wm = 'вацок-генератор';
+    x.fillText(wm, W - PAD - x.measureText(wm).width, H - PAD + 16);
+  }
+
+  // --- тело: правила / уровни / диалог ---
+  function rowsBody(m, y0, y1, kind) {
+    // Две реплики диалога не должны расползаться на всё поле:
+    // ограничиваем шаг и центрируем блок по вертикали.
+    var n = m.r.length, span = y1 - y0;
+    var gap = Math.min(span / n, 112);
+    var top = y0 + (span - gap * n) / 2;
+    for (var i = 0; i < n; i++) {
+      var cy = top + gap * i + gap / 2, tx = PAD, ind = 0;
+      if (kind === 'rules') {
+        x.font = FD(600, 34); x.fillStyle = CV.saffron;
+        x.fillText(String(i + 1), PAD, cy + 12);
+        tx = PAD + 62;
+      } else if (kind === 'levels') {
+        for (var k = 0; k <= i; k++) {
+          x.fillStyle = k === i ? CV.saffron : CV.indigo;
+          x.fillRect(PAD + k * 23, cy - 8, 16, 16);
+        }
+        tx = PAD + 4 * 23 + 24;
+      } else if (kind === 'dialog') {
+        ind = i % 2 ? 46 : 0;
+      }
+      x.font = FB(400, 38);
+      x.fillStyle = (kind === 'dialog' && i % 2) ? CV.saffron : CV.wool;
+      var lines = wrap(m.r[i], CW - (tx - PAD) - ind), lh = 46;
+      var ly = cy - ((lines.length - 1) * lh) / 2 + 13;
+      for (var j = 0; j < lines.length; j++) x.fillText(lines[j], tx + ind, ly + j * lh);
+      if (kind !== 'dialog' && i < n - 1) {
+        x.fillStyle = 'rgba(239,230,212,.12)';
+        x.fillRect(PAD, top + gap * (i + 1), CW, 1);
+      }
+    }
+  }
+
+  // --- тело: справка ---
+  function certBody(m, y0, y1, name) {
+    var nm0 = (name || 'Вацок').toUpperCase();
+    var s0 = fit(nm0, CW, 70, 34, 700);
+    x.font = FB(400, 38);
+    var deed = wrap(m.d, CW);
+    // меряем блок целиком, чтобы поставить его по центру поля
+    var total = 54 + (s0 * 0.95 + 44) + 46 + deed.length * 46 + 30 + 60;
+    var y = y0 + Math.max(0, (y1 - y0 - total) / 2);
+    x.font = FB(400, 24); x.fillStyle = CV.dim; x.fillText('Выдана', PAD, y);
+    y += 54;
+    x.font = FD(700, s0); x.fillStyle = CV.saffron;
+    x.fillText(nm0, PAD, y + s0 * 0.74);
+    y += s0 * 0.95 + 44;
+    x.font = FB(400, 24); x.fillStyle = CV.dim; x.fillText('Основание', PAD, y);
+    y += 46;
+    x.font = FB(400, 38); x.fillStyle = CV.wool;
+    for (var i = 0; i < deed.length; i++) x.fillText(deed[i], PAD, y + i * 46);
+    y += deed.length * 46 + 30;
+    x.font = FD(600, 30);
+    var tw = Math.min(x.measureText(m.s).width + 44, CW);
+    x.strokeStyle = CV.madder; x.lineWidth = 4;
+    x.strokeRect(PAD + 2, y, tw, 60);
+    x.fillStyle = CV.madder; x.fillText(m.s, PAD + 24, y + 40);
+  }
+
+  function render(m, name) {
+    border();
+    var y0 = header(m), y1 = H - PAD - 150;
+    if (m.k === 'cert') certBody(m, y0, y1, name);
+    else rowsBody(m, y0, y1, m.k);
+    footer(m);
+    return cv.toDataURL('image/png');
+  }
+
+  function altOf(m, name) {
+    var body = m.k === 'cert'
+      ? ['Выдана ' + (name || 'Вацок'), m.d, m.s]
+      : m.r;
+    return m.t + '. ' + body.join('. ') + '. ' + m.p;
+  }
+
+  // --- интерфейс ---
+  var img = document.getElementById('meme');
+  var cap = document.getElementById('cap');
+  var nameInput = document.getElementById('name');
+  var chipsBox = document.getElementById('chips');
+  var filter = 'Все', queue = [], current = null;
+
+  try {
+    var saved = localStorage.getItem('vacok-name');
+    if (saved) nameInput.value = saved;
+  } catch (e) {}
+
+  function next() {
+    if (!queue.length) {
+      queue = MEMES.filter(function (m) { return filter === 'Все' || m.c === filter; });
+      for (var i = queue.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = queue[i]; queue[i] = queue[j]; queue[j] = t;
+      }
+      if (queue.length > 1 && current && queue[queue.length - 1] === current) {
+        queue.unshift(queue.pop());
+      }
+    }
+    return queue.pop();
+  }
+
+  function draw(m) {
+    current = m;
+    var name = nameInput.value.trim();
+    img.classList.remove('in');
+    img.src = render(m, name);
+    img.alt = altOf(m, name);
+    cap.textContent = m.k === 'cert'
+      ? 'Справка готова. Зажми картинку, чтобы сохранить.'
+      : 'Зажми картинку и выбери «Сохранить изображение».';
+    requestAnimationFrame(function () { img.classList.add('in'); });
+  }
+
+  function buildChips() {
+    var cats = ['Все'];
+    MEMES.forEach(function (m) { if (cats.indexOf(m.c) < 0) cats.push(m.c); });
+    cats.forEach(function (c) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.textContent = c;
+      b.setAttribute('aria-pressed', String(c === filter));
+      b.addEventListener('click', function () {
+        filter = c; queue = [];
+        chipsBox.querySelectorAll('.chip').forEach(function (o) {
+          o.setAttribute('aria-pressed', String(o.textContent === c));
+        });
+        draw(next());
+      });
+      li.appendChild(b); chipsBox.appendChild(li);
+    });
+  }
+
+  document.getElementById('go').addEventListener('click', function () { draw(next()); });
+  nameInput.addEventListener('input', function () {
+    try { localStorage.setItem('vacok-name', nameInput.value); } catch (e) {}
+    if (current && current.k === 'cert') draw(current);
+  });
+
+  (function boot() {
+    var fonts = document.fonts
+      ? Promise.all([
+          document.fonts.load('700 76px Oswald'),
+          document.fonts.load('600 34px Oswald'),
+          document.fonts.load('400 38px "PT Sans"'),
+        ]).then(function () { return document.fonts.ready; })
+      : Promise.resolve();
+    fonts.catch(function () {}).then(function () {
+      buildChips();
+      draw(next());
+    });
+  })();
+})();
+</script>

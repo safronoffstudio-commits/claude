@@ -1,0 +1,31 @@
+<div class="wrap">
+  <div class="strip" aria-hidden="true"></div>
+
+  <h1>Вацок-генератор</h1>
+  <p class="lead">Мемы про хинкал, гостеприимство, борьбу и родню.
+  Жми кнопку — получишь картинку. Зажми картинку — сохранишь.</p>
+
+  <p class="eyebrow" id="catLabel">Тема</p>
+  <ul class="chips" id="chips" role="group" aria-labelledby="catLabel"></ul>
+
+  <figure>
+    <div class="frame">
+      <img id="meme" class="fade" alt="Мем про дагестанское гостеприимство" width="1080" height="1080">
+    </div>
+    <figcaption id="cap">Зажми картинку и выбери «Сохранить изображение».</figcaption>
+  </figure>
+
+  <button class="go" id="go" type="button">Ещё мем</button>
+
+  <div class="field">
+    <label for="name">Имя для справки</label>
+    <input id="name" type="text" maxlength="18" autocomplete="off"
+           spellcheck="false" placeholder="Вацок" value="">
+  </div>
+  <p class="hint">Подставляется в «Справки» — выбери эту тему выше.</p>
+
+  <footer>
+    Юмор про своих: еда, родня, свадьбы, серпантины и спортзал.
+    Ничего обидного — только то, над чем смеются сами.
+  </footer>
+</div>

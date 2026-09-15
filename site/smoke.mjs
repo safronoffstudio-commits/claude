@@ -1,0 +1,21 @@
+import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 390, height: 800 } });
+const errs = [];
+p.on('pageerror', (e) => errs.push(e.message));
+await p.goto('file://' + process.cwd() + '/index.html');
+await p.waitForFunction(() => {
+  const i = document.getElementById('meme');
+  return i && i.src && i.src.startsWith('data:image');
+}, { timeout: 20000 });
+const chips = await p.$$eval('.chip', (n) => n.length);
+await p.click('#go');
+await p.waitForTimeout(300);
+const src2 = await p.getAttribute('#meme', 'src');
+const of = await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+console.log('картинка рендерится: да');
+console.log('чипов тем:', chips);
+console.log('кнопка «Ещё» работает:', src2 && src2.length > 1000 ? 'да' : 'НЕТ');
+console.log('гориз. скролл:', of ? 'ЕСТЬ' : 'нет');
+console.log('ошибки JS:', errs.length ? errs.join('; ') : 'нет');
+await b.close();
