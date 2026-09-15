@@ -1,0 +1,19 @@
+{
+  "name": "distance-meme-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Telegram-бот, который генерирует мемы про непреодолимые дистанции",
+  "scripts": {
+    "preview": "node test/render-local.mjs",
+    "dev": "vercel dev",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "dependencies": {
+    "@vercel/og": "^1.0.2",
+    "react": "^19.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
