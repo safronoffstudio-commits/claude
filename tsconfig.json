@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+    "types": ["node"],
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": ["src", "test"]
+}
