@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Тебе приглашение 💌</title>
+  <meta name="description" content="Открой, это важно 🙈">
+  <meta name="theme-color" content="#ffdbe8">
+  <meta name="robots" content="noindex">
+
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:title" content="Тебе приглашение 💌">
+  <meta property="og:description" content="Открой, это важно 🙈">
+  <meta property="og:url" content="__SITE_URL__/">
+  <meta property="og:image" content="__SITE_URL__/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Конверт с сердечком и надпись «Тебе приглашение»">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Nunito:wght@600;700;800&family=Unbounded:wght@600;700&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/confetti.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true">
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+  </div>
+  <div class="hearts" id="hearts" aria-hidden="true"></div>
+
+  <main class="card" id="card" data-screen="ask">
+    <div class="progress" id="progress" hidden>
+      <span class="progress-label" id="progress-label">Шаг 1 из 2</span>
+      <span class="progress-track"><span class="progress-bar" id="progress-bar"></span></span>
+    </div>
+
+    <div class="mascot" id="mascot" aria-hidden="true">
+      <span class="mascot-glow"></span>
+      <span class="mascot-float" id="mascot-float">
+        <span class="mascot-char" id="mascot-char">🥺</span>
+      </span>
+    </div>
+
+    <!-- 1. Вопрос -->
+    <section class="screen is-active" id="screen-ask" aria-labelledby="ask-title">
+      <p class="kicker" id="ask-kicker">У меня есть вопрос…</p>
+      <h1 class="title" id="ask-title">Ты пойдёшь со мной на свидание?</h1>
+      <p class="lead" id="ask-hint" aria-live="polite">Только честно 🙈</p>
+      <div class="choices" id="choices">
+        <button class="btn btn-yes" id="btn-yes" type="button">Да 💖</button>
+        <button class="btn btn-no" id="btn-no" type="button" tabindex="-1">Нет</button>
+      </div>
+    </section>
+
+    <!-- 2. Ура -->
+    <section class="screen" id="screen-yay" aria-labelledby="yay-title">
+      <h2 class="title title-xl" id="yay-title">Ура-а-а! 🎉</h2>
+      <p class="lead">Это лучший ответ на свете.<br>Осталось выбрать, когда 💫</p>
+      <div class="actions">
+        <button class="btn btn-primary btn-big" id="btn-to-date" type="button">Выбрать дату →</button>
+      </div>
+    </section>
+
+    <!-- 3. Дата и время -->
+    <section class="screen" id="screen-date" aria-labelledby="date-title">
+      <h2 class="title" id="date-title">Когда тебе удобно?</h2>
+      <div class="calendar">
+        <div class="cal-head">
+          <button class="cal-nav" id="cal-prev" type="button" aria-label="Предыдущий месяц">‹</button>
+          <span class="cal-month" id="cal-month" aria-live="polite"></span>
+          <button class="cal-nav" id="cal-next" type="button" aria-label="Следующий месяц">›</button>
+        </div>
+        <div class="cal-weekdays" aria-hidden="true">
+          <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+
+      <h3 class="subtitle">Во сколько?</h3>
+      <div class="chips" id="time-chips"></div>
+      <input class="time-input" id="time-custom" type="time" aria-label="Своё время" hidden>
+
+      <p class="picked" id="date-picked" aria-live="polite"></p>
+      <div class="actions">
+        <button class="btn btn-primary" id="date-next" type="button" disabled>Дальше →</button>
+      </div>
+    </section>
+
+    <!-- 4. Планы -->
+    <section class="screen" id="screen-plans" aria-labelledby="plans-title">
+      <h2 class="title" id="plans-title">Чем займёмся?</h2>
+      <p class="lead">Можно выбрать несколько ✨</p>
+      <div class="activities" id="activities"></div>
+      <label class="field">
+        <span class="field-label">Пожелания или секретик <span class="muted">(необязательно)</span></span>
+        <textarea id="wish" rows="3" maxlength="300" placeholder="Например: хочу смотреть закат на крыше 🌇"></textarea>
+      </label>
+      <div class="actions">
+        <button class="btn btn-ghost" id="plans-back" type="button">← Назад</button>
+        <button class="btn btn-primary" id="plans-send" type="button" disabled>Отправить 💌</button>
+      </div>
+    </section>
+
+    <!-- 5. Готово -->
+    <section class="screen" id="screen-done" aria-labelledby="done-title">
+      <h2 class="title" id="done-title">Свидание назначено! 💌</h2>
+      <div class="ticket">
+        <div class="ticket-row">
+          <span class="ticket-ico" aria-hidden="true">🗓️</span>
+          <div><span class="ticket-label">Когда</span><span class="ticket-value" id="t-when"></span></div>
+        </div>
+        <div class="ticket-row">
+          <span class="ticket-ico" aria-hidden="true">✨</span>
+          <div><span class="ticket-label">Планы</span><span class="ticket-value" id="t-plans"></span></div>
+        </div>
+        <div class="ticket-row" id="t-wish-row" hidden>
+          <span class="ticket-ico" aria-hidden="true">💬</span>
+          <div><span class="ticket-label">Пожелание</span><span class="ticket-value" id="t-wish"></span></div>
+        </div>
+      </div>
+      <p class="status" id="send-status" aria-live="polite"></p>
+      <p class="cal-caption">Добавить в календарь</p>
+      <div class="cal-links">
+        <a class="btn btn-soft" id="gcal" target="_blank" rel="noopener">Google</a>
+        <button class="btn btn-soft" id="ics" type="button">iPhone</button>
+      </div>
+      <p class="signature">Жду не дождусь 🥰</p>
+      <button class="link-btn" id="restart" type="button">Изменить ответ</button>
+    </section>
+  </main>
+</body>
+</html>

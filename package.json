@@ -1,0 +1,9 @@
+{
+  "name": "dlya-tebya",
+  "private": true,
+  "description": "Приглашение на свидание с убегающей кнопкой «Нет» и ответами в Telegram",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}
