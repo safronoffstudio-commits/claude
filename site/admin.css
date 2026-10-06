@@ -1,0 +1,368 @@
+:root {
+  --rose: #ff4d8d;
+  --rose-2: #ff85b3;
+  --rose-deep: #e0336f;
+  --plum: #3b0f2c;
+  --text: #6b3a57;
+  --muted: #a5809a;
+  --line: #f5d3e1;
+  --soft: #fff1f6;
+  --grad: linear-gradient(135deg, #ff4d8d 0%, #ff7aa9 100%);
+  --font-display: "Unbounded", "Nunito", system-ui, sans-serif;
+  --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--text);
+  background: #ffe9f1 linear-gradient(160deg, #ffe9f1 0%, #ffd6e6 50%, #f3ddff 100%) no-repeat;
+  background-size: 100% 100%;
+  background-attachment: fixed;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.wrap {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.2;
+  color: var(--plum);
+}
+
+a {
+  color: var(--rose-deep);
+}
+
+.panel {
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  box-shadow: 0 24px 60px -30px rgba(214, 51, 108, 0.45);
+}
+
+/* ---------- Кнопки и поля ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.15s ease, opacity 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(255, 77, 141, 0.35);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--grad);
+  box-shadow: 0 10px 22px -10px rgba(255, 77, 141, 0.8);
+}
+
+.btn-soft {
+  color: var(--rose-deep);
+  background: #fff;
+  border: 1.5px solid var(--line);
+}
+
+.btn-ghost {
+  color: var(--muted);
+  background: transparent;
+}
+
+.btn-danger {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #b3415e;
+  background: #fff;
+  border: 1.5px solid #f3c9d6;
+}
+
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--plum);
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--rose-2);
+}
+
+.message {
+  min-height: 1.3em;
+  margin: 12px 0 0;
+  font-weight: 700;
+  color: #c23a4e;
+  white-space: pre-line;
+}
+
+.message:empty {
+  display: none;
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------- Вход ---------- */
+
+.login {
+  max-width: 400px;
+  margin: 12vh auto 0;
+  text-align: center;
+}
+
+.login-emoji {
+  font-size: 52px;
+  line-height: 1;
+}
+
+.login h1 {
+  margin: 12px 0 18px;
+  font-size: 21px;
+}
+
+.login form {
+  display: grid;
+  gap: 10px;
+}
+
+/* ---------- Шапка и статистика ---------- */
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+
+.top-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat {
+  padding: 12px 8px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
+}
+
+.stat b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--plum);
+}
+
+.stat span {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+/* ---------- Ссылка ---------- */
+
+.share {
+  margin-bottom: 12px;
+  padding: 14px 18px;
+}
+
+.share summary {
+  font-weight: 800;
+  color: var(--plum);
+  cursor: pointer;
+}
+
+.share-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.share-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.share-row input {
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* ---------- Карточки ответов ---------- */
+
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.item {
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 0 16px 30px -24px rgba(150, 30, 80, 0.55);
+}
+
+.item.is-final {
+  border-color: #ffb7d0;
+}
+
+.item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.status {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--plum);
+}
+
+.badge {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rose-deep);
+  background: var(--soft);
+}
+
+.badge-test {
+  color: #7a5a00;
+  background: #fff1c2;
+}
+
+.facts {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  background: var(--soft);
+  border-radius: 16px;
+}
+
+.fact {
+  display: flex;
+  gap: 10px;
+  font-weight: 800;
+  color: var(--plum);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.fact-ico {
+  flex: none;
+}
+
+.meta {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-line;
+}
+
+.item-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.empty {
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.empty-emoji {
+  font-size: 44px;
+}
+
+.empty p {
+  margin: 10px 0 0;
+  font-weight: 700;
+}

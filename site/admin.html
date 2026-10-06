@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ответы 💌</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#ffdbe8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Unbounded:wght@600;700&display=swap">
+  <link rel="stylesheet" href="/admin.css">
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+  <main class="wrap">
+    <!-- Вход -->
+    <section class="panel login" id="login" hidden>
+      <div class="login-emoji" aria-hidden="true">🔐</div>
+      <h1>Ответы на приглашение</h1>
+      <form id="login-form">
+        <label class="sr-only" for="password">Пароль</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="Пароль от админки" required>
+        <button class="btn btn-primary" type="submit">Войти</button>
+      </form>
+      <p class="message" id="login-message" role="alert"></p>
+    </section>
+
+    <!-- Ответы -->
+    <section id="app" hidden>
+      <header class="top">
+        <h1>💌 Ответы</h1>
+        <div class="top-actions">
+          <button class="btn btn-soft" id="refresh" type="button">↻ Обновить</button>
+          <button class="btn btn-ghost" id="logout" type="button">Выйти</button>
+        </div>
+      </header>
+
+      <div class="stats" id="stats"></div>
+
+      <details class="panel share">
+        <summary>🔗 Ссылка для отправки</summary>
+        <label class="share-label" for="share-name">Имя (необязательно) — будет «Имя, у меня есть вопрос…»</label>
+        <input id="share-name" type="text" maxlength="40" placeholder="Например, Аня" autocomplete="off">
+        <div class="share-row">
+          <input id="share-link" type="text" readonly aria-label="Ссылка">
+          <button class="btn btn-primary" id="share-copy" type="button">Скопировать</button>
+        </div>
+        <p class="hint">Для проверки открой <a id="test-link" target="_blank" rel="noopener">тестовую ссылку</a>. Такие ответы, как и любые заходы на сайт с этого устройства, помечаются «ТЕСТ» и не попадают в счётчики.</p>
+      </details>
+
+      <p class="message" id="app-message" role="alert"></p>
+      <div class="list" id="list" aria-live="polite"></div>
+    </section>
+  </main>
+</body>
+</html>

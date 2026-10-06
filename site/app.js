@@ -3,11 +3,14 @@
 
   const $ = (selector) => document.querySelector(selector);
 
-  // ?name=Аня — обращение по имени, ?test — тестовый режим (сообщения помечаются «ТЕСТ»).
+  // ?name=Аня — обращение по имени, ?test — тестовый режим (в админке такие ответы помечены «ТЕСТ»).
   const params = new URLSearchParams(location.search);
-  const TEST = params.has('test');
+  // С устройства, где открыта админка, все заходы считаются тестовыми — чтобы не путать свои проверки с её ответом.
+  const TEST = params.has('test') || isAdminDevice();
   const NAME = formatName(params.get('name') || params.get('to') || '');
   const STORE_KEY = 'svidanie:v1';
+  // По этому id админка склеивает «открыли», «да» и итоговый ответ одного человека.
+  const VISITOR_ID = TEST ? randomId() : visitorId();
 
   // Анимированные эмодзи Google Noto; пока картинка грузится, виден обычный эмодзи.
   const EMOJI = {
@@ -65,17 +68,17 @@
   const noBtn = $('#btn-no');
   const hint = $('#ask-hint');
 
-  // ---------- Уведомления ----------
+  // ---------- Отправка ответов ----------
 
   async function notify(event, data = {}, retries = 0) {
-    const payload = { event, attempts: state.attempts, ...data };
+    const payload = { event, visitorId: VISITOR_ID, attempts: state.attempts, ...data };
     if (NAME) payload.name = NAME;
     if (TEST) payload.test = true;
     const body = JSON.stringify(payload);
 
     for (let i = 0; ; i++) {
       try {
-        const res = await fetch('/api/notify', {
+        const res = await fetch('/api/answer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body,
@@ -765,6 +768,27 @@
 
   function capitalize(text) {
     return text ? text[0].toUpperCase() + text.slice(1) : text;
+  }
+
+  function isAdminDevice() {
+    try { return Boolean(localStorage.getItem('svidanie:admin')); } catch (_) { return false; }
+  }
+
+  function randomId() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => (b % 36).toString(36)).join('');
+  }
+
+  function visitorId() {
+    try {
+      let id = localStorage.getItem('svidanie:vid');
+      if (!id || !/^[a-z0-9]{8,32}$/.test(id)) {
+        id = randomId();
+        localStorage.setItem('svidanie:vid', id);
+      }
+      return id;
+    } catch (_) {
+      return randomId();
+    }
   }
 
   function formatName(raw) {

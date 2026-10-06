@@ -1,8 +1,8 @@
 # 💌 Тебе приглашение
 
-Сайт с вопросом «Ты пойдёшь со мной на свидание?». Кнопка «Нет» убегает от курсора и от пальца, нажать её нельзя. После «Да» — конфетти, выбор даты, времени и планов, а ответ прилетает тебе в личку в Telegram.
+Сайт с вопросом «Ты пойдёшь со мной на свидание?». Кнопка «Нет» убегает от курсора и от пальца, нажать её нельзя. После «Да» — конфетти, выбор даты, времени и планов. Все ответы видны в админке на `/admin`.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsafronoffstudio-commits%2Fclaude%2Ftree%2Fsvidanie&project-name=dlya-tebya&repository-name=dlya-tebya&env=TELEGRAM_BOT_TOKEN,TELEGRAM_CHAT_ID&envDescription=%D0%A2%D0%BE%D0%BA%D0%B5%D0%BD%20%D0%B1%D0%BE%D1%82%D0%B0%20%D0%BE%D1%82%20%40BotFather%20%D0%B8%20%D1%82%D0%B2%D0%BE%D0%B9%20%D1%87%D0%B8%D1%81%D0%BB%D0%BE%D0%B2%D0%BE%D0%B9%20id%20%D0%B2%20Telegram%20(%D0%BE%D1%82%20%40userinfobot)&envLink=https%3A%2F%2Fgithub.com%2Fsafronoffstudio-commits%2Fclaude%2Fblob%2Fsvidanie%2FREADME.md%23%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsafronoffstudio-commits%2Fclaude%2Ftree%2Fsvidanie&project-name=dlya-tebya&repository-name=dlya-tebya&env=ADMIN_PASSWORD&envDescription=%D0%9F%D1%80%D0%B8%D0%B4%D1%83%D0%BC%D0%B0%D0%B9%20%D0%BF%D0%B0%D1%80%D0%BE%D0%BB%D1%8C%20%D0%B4%D0%BB%D1%8F%20%D0%B0%D0%B4%D0%BC%D0%B8%D0%BD%D0%BA%D0%B8%20%2Fadmin%20%E2%80%94%20%D0%BF%D0%BE%20%D0%BD%D0%B5%D0%BC%D1%83%20%D0%B1%D1%83%D0%B4%D0%B5%D1%88%D1%8C%20%D1%81%D0%BC%D0%BE%D1%82%D1%80%D0%B5%D1%82%D1%8C%20%D0%BE%D1%82%D0%B2%D0%B5%D1%82%D1%8B&envLink=https%3A%2F%2Fgithub.com%2Fsafronoffstudio-commits%2Fclaude%2Fblob%2Fsvidanie%2FREADME.md%23%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B0&stores=%5B%7B%22type%22%3A%22blob%22%7D%5D)
 
 ## Что внутри
 
@@ -12,50 +12,49 @@
 4. **Планы.** Кофе, кино, суши, прогулка, караоке… можно выбрать несколько и написать пожелание.
 5. **Финал.** «Билет» на свидание и кнопки «добавить в календарь» (Google и iPhone).
 
-## Что приходит в Telegram
+## Админка `/admin`
 
-- 👀 приглашение открыли;
-- 💘 нажали «Да» — и сколько раз пытались нажать «Нет»;
-- 💌 итог: дата, время, планы и пожелание.
-
-Если Telegram вдруг не ответил, сайт попросит сделать скриншот и прислать тебе — ответ не потеряется.
+- Вход по паролю (`ADMIN_PASSWORD`).
+- По каждому человеку: когда открыли ссылку и нажали «Да», сколько раз пытались нажать «Нет», выбранные дата, время, планы и пожелание.
+- Генератор ссылки с именем и кнопка «Скопировать».
+- Удаление лишних записей. Тестовые заходы помечены «ТЕСТ» и не попадают в счётчики.
 
 ## Настройка
 
-### 1. Бот в Telegram (2 минуты)
+### 1. Деплой (2 минуты)
 
-1. Открой [@BotFather](https://t.me/BotFather) → `/newbot` → придумай имя и username (должен заканчиваться на `bot`).
-2. BotFather пришлёт токен вида `123456789:AAH...` — это **`TELEGRAM_BOT_TOKEN`**.
-3. Открой своего нового бота (ссылка есть в том же сообщении) и нажми **«Запустить» / Start** — без этого бот не сможет тебе написать.
-4. Напиши [@userinfobot](https://t.me/userinfobot) — он ответит твоим числовым id (`Id: 123456789`). Это **`TELEGRAM_CHAT_ID`**.
+Нажми **Deploy with Vercel** выше:
 
-### 2. Деплой на Vercel (1 минута)
+1. Войди в Vercel через GitHub.
+2. **Create Git Repository** — выбери свой GitHub, имя можно оставить `dlya-tebya` (если такое уже есть — впиши любое другое).
+3. **Storage** — Vercel сам предложит создать хранилище Blob для ответов: просто подтверди.
+4. **ADMIN_PASSWORD** — придумай пароль от админки.
+5. **Deploy**.
 
-Нажми **Deploy with Vercel** выше → войди через GitHub → вставь `TELEGRAM_BOT_TOKEN` и `TELEGRAM_CHAT_ID` → **Deploy**.
+### 2. Проверка
 
-### 3. Проверка
+1. Открой `https://<твой-проект>.vercel.app/admin` и войди по паролю.
+2. В админке открой «Ссылка для отправки» → «тестовую ссылку», пройди сайт — ответ появится в админке с пометкой «ТЕСТ». Удали его кнопкой «Удалить».
 
-- Открой `https://<твой-проект>.vercel.app/api/notify` — должно быть «Всё настроено ✅». Если нет, там написано, что исправить.
-- Открой `https://<твой-проект>.vercel.app/?test` и пройди всё от начала до конца — сообщения придут с пометкой 🧪 ТЕСТ, ответ не запоминается.
+Если админка пишет «Не подключено хранилище» — в Vercel открой проект → **Storage → Create → Blob → Connect**, потом **Deployments → ⋯ → Redeploy**.
+Пароль меняется в **Settings → Environment Variables → ADMIN_PASSWORD**, после этого тоже **Redeploy**.
 
-После изменения переменных в Vercel нажми **Deployments → ⋯ → Redeploy**, иначе изменения не подхватятся.
+### 3. Отправка
 
-## Как отправлять
-
-- Отправляй ссылку на основной домен проекта (`<твой-проект>.vercel.app`, он в Vercel → Settings → Domains). Адреса отдельных деплоев (с хэшем в названии) Vercel может закрывать логином.
-- `?name=Аня` — обращение по имени: «Аня, у меня есть вопрос…». Например `https://<твой-проект>.vercel.app/?name=Аня`.
-- В превью ссылки (Telegram, Instagram) будет картинка «Тебе приглашение» с конвертом.
+- Ссылку с именем удобнее всего скопировать в админке. Вручную: `https://<твой-проект>.vercel.app/?name=Аня` — будет «Аня, у меня есть вопрос…».
+- Отправляй адрес основного домена проекта (Vercel → Settings → Domains). Адреса отдельных деплоев (с хэшем в названии) Vercel может закрывать логином.
+- Пока на устройстве открыта админка, все твои заходы на сайт с него считаются тестовыми.
 
 ## Как поменять тексты
 
 - Вопрос и подписи — `site/index.html`.
 - Надписи убегающей кнопки, подсказки, время, список планов — константы `NO_LABELS`, `HINTS`, `TIMES`, `ACTIVITIES` в начале `site/app.js`.
-- Тексты сообщений в Telegram — `api/notify.js`.
 
 После пуша в репозиторий Vercel передеплоит сайт сам.
 
 ## Как устроено
 
 - `site/` — статика без фреймворков (HTML, CSS, JS). `build.mjs` копирует её в `public/` и подставляет полный адрес сайта для превью ссылки.
-- `api/notify.js` — серверная функция Vercel: принимает ответы и шлёт их через Telegram Bot API. Токен бота хранится только в переменных окружения Vercel и в браузер не попадает.
+- `api/answer.js` — принимает ответы со страницы и сохраняет каждый шаг отдельным файлом в Vercel Blob (`lib/store.js`). Локально, без Vercel, ответы пишутся в папку `.data/`.
+- `api/admin.js` — отдаёт ответы админке и удаляет их; без правильного пароля ничего не показывает.
 - `site/confetti.js` — [canvas-confetti](https://github.com/catdad/canvas-confetti) (ISC). Анимированные смайлики — [Noto Emoji](https://googlefonts.github.io/noto-emoji-animation/) от Google.
