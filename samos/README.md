@@ -16,7 +16,7 @@ UI-фреймворков и шрифтовых движков. Код ядра,
 | Драйверы | UART PL011 (лог), RTC PL031 (часы), Generic Timer, видео ramfb (через fw_cfg DMA), virtio-input (сенсорный экран и клавиатура), PSCI (перезагрузка и выключение) |
 | Графика | свой 2D-движок: сглаженные фигуры через SDF, скругления, градиенты, «матовое стекло» (размытие), тени, масштабирование, альфа-смешивание |
 | Текст | свой рендер UTF-8 текста, кириллица, перенос строк |
-| Оболочка | загрузочный экран, экран блокировки, домашний экран с виджетами и доком, Dynamic Island, пункт управления, жесты, анимации запуска и закрытия приложений, светлая и тёмная темы, четыре варианта обоев |
+| Оболочка | загрузочный экран, экран блокировки, домашний экран с виджетами и доком, Dynamic Island, **меню «Пуск»** (стеклянная панель в стиле Windows 11 — закреплённые и все приложения, пользователь, питание), пункт управления, жесты, анимации, светлая и тёмная темы, синие обои «Фьюжн» и ещё четыре варианта |
 | Сеть | свой стек с нуля: драйвер virtio-net, Ethernet, ARP, IPv4, ICMP (ping), UDP, DHCP, DNS, TCP |
 | Криптография | свои SHA-1, SHA-256, AES-256 (режимы IGE и CTR), большие числа с умножением Монтгомери (RSA-2048, Диффи-Хеллман-2048), факторизация pq (Поллард-Брент) |
 | Telegram / MTProto | свой клиент протокола MTProto 2.0: TL-сериализация, транспорты (abridged/intermediate/full), рукопожатие создания `auth_key` (req_pq → RSA_PAD → Диффи-Хеллман), зашифрованный слой сообщений (msg_key, AES-IGE), приложение Telegram |
@@ -73,6 +73,10 @@ SamOS в эмуляторе, нажимает «пальцем», печатае
 | ![](screenshots/07_calculator.png) | ![](screenshots/08_notes_keyboard.png) | ![](screenshots/09_terminal.png) | ![](screenshots/10_paint.png) |
 | ![](screenshots/17_settings.png) | ![](screenshots/20_settings_dark.png) | ![](screenshots/18_about.png) | ![](screenshots/16_monitor.png) |
 | ![](screenshots/tg1_welcome.png) | ![](screenshots/tg3_phone.png) | ![](screenshots/tg6_chats.png) | ![](screenshots/tg7_chat.png) |
+| ![](screenshots/23_start.png) | ![](screenshots/24_start_apps.png) | ![](screenshots/02_lock.png) | ![](screenshots/19_control_center.png) |
+
+Внешний вид — синий «стеклянный» стиль в духе macOS и Windows 11: светящиеся обои,
+матовое стекло на панелях, меню «Пуск» с закреплёнными и всеми приложениями.
 
 ## Запуск на Android-телефоне
 

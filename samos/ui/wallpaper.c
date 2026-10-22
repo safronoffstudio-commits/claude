@@ -7,6 +7,12 @@ typedef struct { float x, y, r; u32 col; float k; } Blob;
 typedef struct { const char *name; u32 top, bot; int n; Blob b[6]; } WallDef;
 
 static const WallDef WALLS[] = {
+    { "Фьюжн", HEX(0x2E7BE0), HEX(0x081640), 5, {
+        { 0.50f, 0.40f, 1.05f, HEX(0x58A6FF), 0.95f },   // центральное свечение
+        { 0.50f, 0.36f, 0.52f, HEX(0xAFD4FF), 0.65f },   // яркое ядро
+        { 0.08f, 0.08f, 0.70f, HEX(0x3C82EC), 0.55f },   // блик слева-сверху
+        { 0.96f, 0.90f, 0.80f, HEX(0x0E2A6E), 0.80f },   // тень справа-снизу
+        { 0.50f, 1.12f, 0.95f, HEX(0x050E30), 0.90f } } },
     { "Аврора", HEX(0x0B1030), HEX(0x140A2A), 5, {
         { 0.10f, 0.18f, 0.80f, HEX(0x6D28D9), 0.85f },
         { 0.98f, 0.42f, 0.70f, HEX(0xDB2777), 0.75f },

@@ -22,6 +22,14 @@ static u64 trans_t0;
 static float trans_dur;
 static float ir_x, ir_y, ir_s;          // прямоугольник иконки запущенного приложения
 static bool cc_open, cc_closing;
+static bool start_open, start_closing;
+static u64 start_t0;
+static int start_scroll, start_scroll0, start_down_y;
+static bool start_drag;
+static App *start_pressed;
+static void start_show(void);
+static void start_hide(void);
+static void start_touch(int type, int x, int y);
 static u64 cc_t0;
 static int gesture, gx0, gy0;
 static bool gesture_done;
@@ -471,6 +479,7 @@ static void cc_touch(int type, int x, int y) {
 static void handle_touch(InputEvent *e) {
     int x = e->x, y = e->y;
     if (state == S_BOOT || trans != T_NONE) return;
+    if (start_open && !start_closing) { start_touch(e->type, x, y); return; }
     if (cc_open && !cc_closing) {
         if (e->type == EV_TOUCH_DOWN) { gx0 = x; gy0 = y; }
         if (e->type == EV_TOUCH_UP && gy0 - y > 80 && cc_drag < 0) { cc_hide(); return; }
@@ -509,6 +518,8 @@ static void handle_touch(InputEvent *e) {
     case G_HOMESCREEN:
         if (e->type == EV_TOUCH_MOVE && pressed_app && (abs_i(x - gx0) > 15 || abs_i(y - gy0) > 15)) pressed_app = NULL;
         if (e->type == EV_TOUCH_UP) {
+            // тап по строке «Поиск» открывает меню «Пуск»
+            if (!pressed_app && hit(x, y, (SCR_W - 118) / 2 - 20, DOCK_Y - 60, 158, 50)) { start_show(); break; }
             float ox, oy;
             App *a = home_hit(x, y, &ox, &oy);
             if (a && a == pressed_app) {
@@ -527,10 +538,129 @@ static void handle_touch(InputEvent *e) {
 static void handle_key(InputEvent *e) {
     if (state == S_BOOT) return;
     if (state == S_LOCK) { unlock(); return; }
+    if (start_open) { if (e->key == KEY_ESC || e->key == KEY_HOME) start_hide(); return; }
     if (e->key == KEY_F1) { if (cc_open) cc_hide(); else cc_show(); return; }
     if (cc_open) { if (e->key == KEY_ESC) cc_hide(); return; }
+    if (state == S_HOME && e->key == KEY_HOME) { start_show(); return; }
     if (e->key == KEY_ESC || e->key == KEY_HOME) { ui_go_home(); return; }
     if (state == S_APP && cur_app->key) cur_app->key(e->key);
+}
+
+/* ---- Меню «Пуск» (стиль Windows 11) ---- */
+static App *const ALLAPPS[] = { &app_telegram, &app_photos, &app_paint, &app_snake, &app_2048,
+    &app_calendar, &app_clock, &app_monitor, &app_notes, &app_calc, &app_terminal, &app_settings };
+#define N_ALL   ARRAY_LEN(ALLAPPS)
+#define SM_TOP  96.f
+#define SM_M    24.f
+#define SM_COLW ((SCR_W - 2 * SM_M) / 4.f)
+#define SM_BAR  96.f
+#define SM_PIN  58.f
+
+static void start_show(void) { start_open = true; start_closing = false; start_t0 = timer_ms(); start_scroll = 0; dirty = true; }
+static void start_hide(void) { start_closing = true; start_t0 = timer_ms(); dirty = true; }
+static float start_progress(u64 now) {
+    float t = fclamp((float)(now - start_t0) / 300.f, 0.f, 1.f);
+    return start_closing ? 1.f - ease_out_cubic(t) : ease_out_cubic(t);
+}
+
+// Высота прокручиваемого содержимого (от строки поиска до конца списка).
+static float start_content_h(void) {
+    return 16 + 46 + 44 + 2 * 104 + 40 + 36 + (float)N_ALL * 56 + 20;
+}
+static int start_scroll_max(void) {
+    int m = (int)(start_content_h() - (SCR_H - SM_TOP - SM_BAR));
+    return m > 0 ? m : 0;
+}
+
+static void start_power_glyph(Canvas *c, float cx, float cy, u32 col) {
+    gfx_arc(c, cx, cy + 1, 10, 2.8f, -1.05f, 4.19f, col);
+    gfx_line(c, cx, cy - 13, cx, cy - 1, 2.8f, col);
+}
+
+static void draw_start(Canvas *c, float t) {
+    gfx_fill(c, 0, 0, SCR_W, SCR_H, ARGB((int)(150 * t), 2, 8, 24));
+    float panelY = flerp(SCR_H, SM_TOP, t);
+    float ph = SCR_H - panelY + 20;
+    gfx_glass(c, &g_wall_blur, 10, panelY, SCR_W - 20, ph, 30, ARGB(170, 14, 30, 64));
+    gfx_rrect_stroke(c, 10, panelY, SCR_W - 20, ph, 30, 1.5f, ARGB(45, 255, 255, 255));
+
+    float cy0 = panelY + 16 - (float)start_scroll;
+    gfx_clip(c, 10, (int)panelY + 2, SCR_W - 10, (int)(SCR_H - SM_BAR));
+
+    // строка поиска
+    gfx_rrect(c, SM_M, cy0, SCR_W - 2 * SM_M, 46, 13, ARGB(130, 8, 20, 48));
+    gfx_ring(c, SM_M + 24, cy0 + 23, 7, 2.2f, ALPHA(WHITE, 150));
+    gfx_line(c, SM_M + 29, cy0 + 28, SM_M + 34, cy0 + 33, 2.4f, ALPHA(WHITE, 150));
+    text_draw(c, &font_body, (int)SM_M + 46, (int)cy0 + 31, "Поиск приложений и файлов…", ALPHA(WHITE, 150));
+
+    // Закреплённые
+    text_draw(c, &font_small_sb, (int)SM_M, (int)cy0 + 86, "Закреплённые", WHITE);
+    draw_chevron_right(c, SCR_W - SM_M - 6, cy0 + 82, 7, ALPHA(WHITE, 150));
+    float gridTop = cy0 + 104;
+    for (int i = 0; i < 8; i++) {
+        float x = SM_M + (i % 4) * SM_COLW + (SM_COLW - SM_PIN) / 2;
+        float y = gridTop + (i / 4) * 104;
+        draw_app_icon(c, ALLAPPS[i], x, y, SM_PIN);
+        if (ALLAPPS[i] == start_pressed) gfx_rrect(c, x, y, SM_PIN, SM_PIN, SM_PIN * 0.225f, ARGB(90, 0, 0, 0));
+        text_center(c, &font_caption, (int)(x + SM_PIN / 2), (int)(y + SM_PIN + 20), ALLAPPS[i]->name, ALPHA(WHITE, 235));
+    }
+    // Все приложения
+    float listHdr = gridTop + 2 * 104 + 20;
+    text_draw(c, &font_small_sb, (int)SM_M, (int)listHdr, "Все приложения", WHITE);
+    draw_chevron_right(c, SCR_W - SM_M - 6, listHdr - 4, 7, ALPHA(WHITE, 150));
+    float listTop = listHdr + 30;
+    for (int i = 0; i < (int)N_ALL; i++) {
+        float y = listTop + (float)i * 56;
+        if (ALLAPPS[i] == start_pressed) gfx_rrect(c, SM_M - 8, y, SCR_W - 2 * SM_M + 16, 52, 12, ARGB(60, 255, 255, 255));
+        draw_app_icon(c, ALLAPPS[i], SM_M, y + 7, 38);
+        text_draw(c, &font_body, (int)SM_M + 56, (int)y + 34, ALLAPPS[i]->name, WHITE);
+    }
+    gfx_noclip(c);
+
+    // нижняя панель: пользователь + питание
+    float by = SCR_H - SM_BAR;
+    gfx_glass(c, &g_wall_blur, 10, by, SCR_W - 20, SM_BAR - 4, 0, ARGB(150, 10, 22, 50));
+    gfx_fill(c, 20, (int)by, SCR_W - 40, 1, ARGB(30, 255, 255, 255));
+    gfx_circle(c, 56, by + 44, 26, HEX(0x5E7CE6));
+    draw_logo(c, 56, by + 44, 34, WHITE);
+    text_draw(c, &font_body_sb, 98, (int)by + 40, "Владелец SamOS", WHITE);
+    text_draw(c, &font_caption, 98, (int)by + 64, "SamOS 1.0", ALPHA(WHITE, 150));
+    gfx_circle(c, SCR_W - 54, by + 44, 24, ARGB(60, 255, 255, 255));
+    start_power_glyph(c, SCR_W - 54, by + 44, WHITE);
+}
+
+static void start_touch(int type, int x, int y) {
+    float cy0 = SM_TOP + 16 - (float)start_scroll;
+    if (type == EV_TOUCH_DOWN) {
+        start_down_y = y; start_scroll0 = start_scroll; start_drag = false;
+        start_pressed = NULL;
+        if (y < SM_TOP) return;
+        float gridTop = cy0 + 104;
+        for (int i = 0; i < 8; i++) {
+            float ix = SM_M + (i % 4) * SM_COLW + (SM_COLW - SM_PIN) / 2, iy = gridTop + (i / 4) * 104;
+            if (hit(x, y, ix - 6, iy - 4, SM_PIN + 12, SM_PIN + 28)) start_pressed = ALLAPPS[i];
+        }
+        float listTop = gridTop + 2 * 104 + 20 + 30;
+        for (int i = 0; i < (int)N_ALL; i++)
+            if (hit(x, y, SM_M - 8, listTop + (float)i * 56, SCR_W - 2 * SM_M + 16, 52) && y < SCR_H - SM_BAR)
+                start_pressed = ALLAPPS[i];
+        return;
+    }
+    if (type == EV_TOUCH_MOVE) {
+        if (abs_i(y - start_down_y) > 10) { start_drag = true; start_pressed = NULL; }
+        if (start_drag) start_scroll = CLAMP(start_scroll0 - (y - start_down_y), 0, start_scroll_max());
+        return;
+    }
+    if (type == EV_TOUCH_UP) {
+        if (y < SM_TOP && !start_drag) { start_hide(); return; }
+        if (start_down_y < SM_TOP && y - start_down_y > 60) { start_hide(); return; }
+        if (!start_drag && start_pressed) { App *a = start_pressed; start_pressed = NULL; start_open = false; ui_launch(a); return; }
+        // кнопка питания
+        float by = SCR_H - SM_BAR;
+        if (hit(x, y, SCR_W - 90, by + 10, 72, 72)) { start_open = false; ui_lock(); return; }
+        start_pressed = NULL;
+        start_drag = false;
+    }
 }
 
 /* ---- Отрисовка кадра ---- */
@@ -569,6 +699,12 @@ static void render(u64 now) {
         break;
     }
     if (trans != T_NONE && t >= 1.f) { trans = T_NONE; dirty = true; }
+    if (start_open) {
+        float p = start_progress(now);
+        draw_start(c, p);
+        draw_status_bar(c, WHITE, false);
+        if (start_closing && p <= 0.f) { start_open = false; dirty = true; }
+    }
     if (cc_open) {
         float p = cc_progress(now);
         draw_cc(c, p);
@@ -598,7 +734,7 @@ void ui_main(void) {
         }
         u64 now = timer_ms();
         time_sync_tick();
-        bool anim = trans != T_NONE || (cc_open && now - cc_t0 < 300);
+        bool anim = trans != T_NONE || (cc_open && now - cc_t0 < 300) || (start_open && now - start_t0 < 340);
         if (state == S_APP && trans == T_NONE && cur_app->tick && cur_app->tick(now)) anim = true;
         u64 sec = time_unix_ms() / 1000;
         if (sec != last_sec) { last_sec = sec; dirty = true; }
