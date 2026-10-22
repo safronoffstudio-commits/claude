@@ -213,6 +213,16 @@ static void copy_row(int y, int x0, int x1)
     }
 }
 
+uint32_t *gfx_backbuffer(void)
+{
+    return bb;
+}
+
+void gfx_mark(int x, int y, int w, int h)
+{
+    mark_dirty(x, y, x + w, y + h);
+}
+
 void gfx_flush(void)
 {
     if (!scr.graphics)

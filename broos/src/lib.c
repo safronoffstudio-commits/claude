@@ -294,6 +294,22 @@ size_t utf8_count(const char *s, size_t bytes)
     return n;
 }
 
+/* ---- debug output on COM1 (QEMU: -serial stdio) ---- */
+
+void dbg(const char *fmt, ...)
+{
+    char buf[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    for (const char *p = buf; *p; p++) {
+        for (int i = 0; i < 10000 && !(inb(0x3F8 + 5) & 0x20); i++)
+            ;
+        outb(0x3F8, *p);
+    }
+}
+
 /* ---- misc ---- */
 
 static uint64_t rng_state = 0x9E3779B97F4A7C15ULL;

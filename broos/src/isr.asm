@@ -21,9 +21,13 @@ isr_common:
     push r13
     push r14
     push r15
-    mov rdi, rsp
+    mov rdi, rsp                ; struct regs *
+    sub rsp, 512                ; FPU/SSE state (rsp is 16-byte aligned here)
+    fxsave64 [rsp]
     cld
     call isr_dispatch
+    fxrstor64 [rsp]
+    add rsp, 512
     pop r15
     pop r14
     pop r13

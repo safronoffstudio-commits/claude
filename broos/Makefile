@@ -7,7 +7,7 @@ LD      := ld
 CFLAGS  := -std=gnu11 -O2 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
            -ffreestanding -fno-builtin -fno-stack-protector -fno-pic -fno-pie \
            -fno-asynchronous-unwind-tables -fno-tree-loop-distribute-patterns -fwrapv \
-           -mno-red-zone -mgeneral-regs-only -m64 -march=x86-64
+           -fno-math-errno -mno-red-zone -m64 -march=x86-64 -msse2
 LDFLAGS := -n -nostdlib -static -z max-page-size=0x1000 -z noexecstack --no-warn-rwx-segments -T src/linker.ld
 
 BUILD   := build
@@ -22,15 +22,21 @@ OVMF    ?= /usr/share/ovmf/OVMF.fd
 QEMU    ?= qemu-system-x86_64
 QFLAGS  ?= -m 512M -serial stdio
 
-.PHONY: all iso run run-uefi run-usb usb clean font
+.PHONY: all iso run run-uefi run-usb usb clean font assets
 
 all: iso
 
-$(BUILD)/%.o: src/%.c src/kernel.h src/font.h | $(BUILD)
+$(BUILD)/%.o: src/%.c src/*.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/%.asm.o: src/%.asm | $(BUILD)
 	$(AS) -f elf64 $< -o $@
+
+$(BUILD)/assets.asm.o: assets/assets.bin
+
+# Regenerate the desktop assets (fonts, icons, cursor, wallpapers).
+assets:
+	python3 tools/mkassets.py
 
 $(KERNEL): $(OBJS) src/linker.ld
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)

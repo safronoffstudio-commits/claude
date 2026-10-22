@@ -127,7 +127,10 @@ void isr_dispatch(struct regs *r)
             panic_test = false;
             if (crash_screen(exc_names[6], r, true)) {
                 r->rip += 2;            /* skip the ud2 */
-                con_redraw();
+                if (desktop_mode)
+                    gui_redraw_all();
+                else
+                    con_redraw();
                 return;
             }
             reboot();

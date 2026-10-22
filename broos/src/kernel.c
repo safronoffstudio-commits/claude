@@ -1,5 +1,5 @@
 /* BroOS kernel entry point. */
-#include "kernel.h"
+#include "gui.h"
 
 static char brand[49], vendor[13];
 
@@ -47,6 +47,16 @@ static void ok(const char *fmt, ...)
     gfx_flush();
 }
 
+bool desktop_mode;
+
+static int boot_step;
+
+static void progress(void)
+{
+    if (desktop_mode)
+        gui_boot_progress(++boot_step * 100 / 9, NULL);
+}
+
 void kmain(uint32_t magic, uint64_t info)
 {
     bool mb_ok = mb2_parse(magic, info);
@@ -55,6 +65,10 @@ void kmain(uint32_t magic, uint64_t info)
     gfx_init();
     timer_init();
     con_init();
+    desktop_mode = scr.graphics && !cmdline_has("text") && gui_init();
+    if (desktop_mode)
+        con_set_sink(&con_log_sink);       /* the boot log goes to dmesg */
+    progress();
     cpu_detect();
     rand_seed(rdtsc());
 
@@ -62,33 +76,48 @@ void kmain(uint32_t magic, uint64_t info)
         kprintf("Внимание: загрузчик не Multiboot2, работаю как получится.\n");
     ok("Загрузчик: %s (%s)", boot.loader[0] ? boot.loader : "?", boot.efi ? "UEFI" : "BIOS");
     if (scr.graphics)
-        ok("Экран: %ux%u, %u бит, %dx%d символов", scr.width, scr.height, boot.fb_bpp, scr.cols, scr.rows);
+        ok("Экран: %ux%u, %u бит", scr.width, scr.height, boot.fb_bpp);
     else
         ok("Экран: текстовый режим %dx%d", scr.cols, scr.rows);
     ok("Процессор: %s", cpu_brand());
     ok("Память: %lu МБ, свободно под кучу %lu МБ", mm_total_ram() >> 20,
        (mm_heap_size() - mm_heap_used()) >> 20);
     ok("Прерывания и таймер: %s", timer_irq_works() ? "IRQ 1000 Гц" : "режим опроса (IRQ не пришли)");
+    progress();
     bool ps2 = kbd_init();
     ok("Клавиатура: %s, раскладки EN и RU", ps2 ? "PS/2-контроллер на месте" : "PS/2-контроллера нет");
+    progress();
+    bool ps2_mouse = mouse_init();
+    ok("Мышь PS/2: %s", ps2_mouse ? (mouse_has_wheel() ? "есть, с колесом" : "есть") : "нет");
+    progress();
     /* Under BIOS the firmware usually emulates PS/2 for USB keyboards; we only
      * take controllers it does not hold. On UEFI we take them all.
      * "usb" forces the driver, "nousb" disables it. */
     if (!cmdline_has("nousb")) {
         int kb = usb_init(boot.efi || cmdline_has("usb"));
         if (usb_firmware_controllers())
-            ok("USB: xHCI у BroOS: %d, у прошивки (эмуляция PS/2): %d, USB-клавиатур: %d",
-               usb_controllers(), usb_firmware_controllers(), kb);
+            ok("USB: xHCI у BroOS: %d, у прошивки (эмуляция PS/2): %d, клавиатур: %d, мышей: %d",
+               usb_controllers(), usb_firmware_controllers(), kb, usb_mice());
         else
-            ok("USB: контроллеров xHCI: %d, USB-клавиатур: %d", usb_controllers(), kb);
+            ok("USB: контроллеров xHCI: %d, клавиатур: %d, мышей: %d", usb_controllers(), kb, usb_mice());
     } else {
         ok("USB: свой драйвер выключен (nousb)");
     }
+    progress();
     acpi_init();
     ok("ACPI: %s", acpi_present() ? "найден, выключение доступно" : "нет, выключай кнопкой");
+    progress();
     fs_init();
     ok("BroFS: %d файла в оперативной памяти", fs_count());
-    kprintf("\n");
+    progress();
 
+    if (desktop_mode) {
+        gui_set_wallpaper(0);
+        progress();
+        sleep_ms(200);
+        progress();
+        gui_main();
+    }
+    kprintf("\n");
     shell_run();
 }

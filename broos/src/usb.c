@@ -1,6 +1,7 @@
-/* xHCI USB host controller driver, just enough for HID boot keyboards
- * (on root ports and behind USB 2.0 hubs). Everything is polled: no IRQs.
- * Key reports are translated to set-1 scan codes and fed to kbd.c. */
+/* xHCI USB host controller driver, just enough for HID boot keyboards and
+ * mice (on root ports and behind USB 2.0 hubs). Everything is polled: no
+ * IRQs. Key reports are translated to set-1 scan codes and fed to kbd.c,
+ * mouse reports go to mouse.c. */
 #include "kernel.h"
 
 /* ---- PCI configuration space (mechanism #1) ---- */
@@ -53,13 +54,16 @@ struct usb_dev {
     struct ring ep0;
     uint8_t *in_ctx, *out_ctx;
     uint8_t *buf;                 /* DMA buffer for control transfers */
-    /* keyboard */
-    bool kbd;
-    int kbd_dci, kbd_mps;
-    struct ring intr;
-    uint8_t *report;
-    uint8_t prev[8];
+    struct hid {
+        int kind;                 /* HID_KEYBOARD / HID_MOUSE */
+        int dci, mps;
+        struct ring intr;
+        uint8_t *report;
+        uint8_t prev[8];
+    } hid[2];
+    int nhid;
 };
+enum { HID_KEYBOARD = 1, HID_MOUSE = 2 };
 
 #define MAX_DEVS 32
 
@@ -156,7 +160,7 @@ static void ring_reserve(struct ring *r, int n)
 
 /* ---- events ---- */
 
-static void kbd_report(struct usb_dev *d, uint32_t code);
+static void hid_report(struct usb_dev *d, struct hid *h, uint32_t code);
 
 static void process_events(struct hc *hc)
 {
@@ -179,12 +183,15 @@ static void process_events(struct hc *hc)
             hc->cmd_slot = slot;
         } else if (type == TRB_TRANSFER_EVENT) {
             int dci = (ev.control >> 16) & 31;
-            struct usb_dev *kd = NULL;
-            for (int i = 0; i < dev_count; i++)
-                if (devs[i].hc == hc && devs[i].slot == slot && devs[i].kbd && devs[i].kbd_dci == dci)
-                    kd = &devs[i];
-            if (kd) {
-                kbd_report(kd, code);
+            struct usb_dev *hd = NULL;
+            struct hid *h = NULL;
+            for (int i = 0; i < dev_count && !h; i++)
+                if (devs[i].hc == hc && devs[i].slot == slot)
+                    for (int k = 0; k < devs[i].nhid; k++)
+                        if (devs[i].hid[k].dci == dci)
+                            hd = &devs[i], h = &devs[i].hid[k];
+            if (h) {
+                hid_report(hd, h, code);
             } else {
                 hc->xfer_done = true;
                 hc->xfer_code = code;
@@ -289,17 +296,20 @@ static bool has_key(const uint8_t *r, uint8_t k)
     return false;
 }
 
-static void kbd_report(struct usb_dev *d, uint32_t code)
+static void hid_report(struct usb_dev *d, struct hid *h, uint32_t code)
 {
-    if (code == CC_SUCCESS || code == CC_SHORT) {
-        const uint8_t *r = d->report;
+    if ((code == CC_SUCCESS || code == CC_SHORT) && h->kind == HID_MOUSE) {
+        const int8_t *r = (const int8_t *)h->report;
+        mouse_report(r[1], r[2], h->mps >= 4 ? -r[3] : 0, r[0] & 7);
+    } else if (code == CC_SUCCESS || code == CC_SHORT) {
+        const uint8_t *r = h->report;
         if (r[2] != 1) {                          /* 1 = ErrorRollOver: ignore */
-            uint8_t changed = r[0] ^ d->prev[0];
+            uint8_t changed = r[0] ^ h->prev[0];
             for (int b = 0; b < 8; b++)
                 if (changed & (1 << b))
                     emit(mod_to_set1[b], !(r[0] & (1 << b)));
             for (int i = 2; i < 8; i++) {
-                uint8_t k = d->prev[i];
+                uint8_t k = h->prev[i];
                 if (k > 3 && k < sizeof hid_to_set1 && !has_key(r, k)) {
                     emit(hid_to_set1[k], true);
                     if ((hid_to_set1[k] & 0x7F) == rep_sc)
@@ -308,22 +318,22 @@ static void kbd_report(struct usb_dev *d, uint32_t code)
             }
             for (int i = 2; i < 8; i++) {
                 uint8_t k = r[i];
-                if (k > 3 && k < sizeof hid_to_set1 && !has_key(d->prev, k) && hid_to_set1[k]) {
+                if (k > 3 && k < sizeof hid_to_set1 && !has_key(h->prev, k) && hid_to_set1[k]) {
                     emit(hid_to_set1[k], false);
                     rep_sc = hid_to_set1[k] & 0x7F;
                     rep_ext = hid_to_set1[k] & 0x80;
                     rep_at = timer_ms() + 500;
                 }
             }
-            memcpy(d->prev, r, 8);
+            memcpy(h->prev, r, 8);
         }
     }
     /* queue the next report */
-    ring_push(&d->intr, (uint64_t)d->report, d->kbd_mps, TRB_TYPE(TRB_NORMAL) | TRB_IOC | TRB_ISP);
-    d->hc->db[d->slot] = d->kbd_dci;
+    ring_push(&h->intr, (uint64_t)h->report, h->mps, TRB_TYPE(TRB_NORMAL) | TRB_IOC | TRB_ISP);
+    d->hc->db[d->slot] = h->dci;
 }
 
-static bool setup_keyboard(struct usb_dev *d, int iface, uint8_t ep_addr, int mps, int interval)
+static bool setup_hid(struct usb_dev *d, int kind, int iface, uint8_t ep_addr, int mps, int interval)
 {
     control(d, 0x21, 0x0B, 0, iface, 0, NULL);   /* SET_PROTOCOL(boot) */
     control(d, 0x21, 0x0A, 0, iface, 0, NULL);   /* SET_IDLE(0) */
@@ -341,9 +351,12 @@ static bool setup_keyboard(struct usb_dev *d, int iface, uint8_t ep_addr, int mp
             ival++;
         ival = MIN(MAX(ival, 3), 10);
     }
-    if (!ring_init(&d->intr, 64))
+    if (d->nhid == 2)
         return false;
-    d->report = dma_alloc(64, 64);
+    struct hid *h = &d->hid[d->nhid];
+    if (!ring_init(&h->intr, 64))
+        return false;
+    h->report = dma_alloc(64, 64);
 
     in_ctx_from_output(d);
     in_ctx(d, 0)[1] = 1 | (1u << dci);           /* add slot + endpoint */
@@ -354,23 +367,24 @@ static bool setup_keyboard(struct usb_dev *d, int iface, uint8_t ep_addr, int mp
     uint32_t *ep = in_ctx(d, dci + 1);
     ep[0] = (uint32_t)ival << 16;
     ep[1] = (3 << 1) | (7 << 3) | ((uint32_t)mps << 16);  /* CErr 3, Interrupt IN */
-    ep[2] = (uint32_t)(uint64_t)d->intr.trb | 1;
-    ep[3] = (uint32_t)((uint64_t)d->intr.trb >> 32);
+    ep[2] = (uint32_t)(uint64_t)h->intr.trb | 1;
+    ep[3] = (uint32_t)((uint64_t)h->intr.trb >> 32);
     ep[4] = 8 | ((uint32_t)mps << 16);
     if (command(d->hc, (uint64_t)d->in_ctx, TRB_TYPE(TRB_CONFIGURE_EP) | (d->slot << 24), NULL) != CC_SUCCESS)
         return false;
 
-    d->kbd = true;
-    d->kbd_dci = dci;
-    d->kbd_mps = mps;
-    ring_push(&d->intr, (uint64_t)d->report, mps, TRB_TYPE(TRB_NORMAL) | TRB_IOC | TRB_ISP);
+    h->kind = kind;
+    h->dci = dci;
+    h->mps = mps;
+    d->nhid++;
+    ring_push(&h->intr, (uint64_t)h->report, mps, TRB_TYPE(TRB_NORMAL) | TRB_IOC | TRB_ISP);
     d->hc->db[d->slot] = dci;
     return true;
 }
 
 /* ---- enumeration ---- */
 
-static int keyboards;
+static int keyboards, mice;
 static void setup_hub(struct usb_dev *h);
 
 static struct usb_dev *new_device(struct hc *hc, int root_port, int speed, uint32_t route,
@@ -441,29 +455,30 @@ static struct usb_dev *new_device(struct hc *hc, int root_port, int speed, uint3
     if (control(d, 0x80, 6, 0x0200, 0, total, cfg))
         return d;
 
-    /* Find a boot keyboard interface or a hub. */
-    int kb_iface = -1, kb_ep = 0, kb_mps = 8, kb_ival = 10, cur_iface = -1;
-    bool cur_is_kbd = false, hub = desc[4] == 9;
+    /* Find boot keyboard / mouse interfaces (a receiver may have both) or a hub. */
+    struct { int kind, iface, ep, mps, ival; } found[2];
+    int nfound = 0, cur_iface = -1, cur_kind = 0;
+    bool hub = desc[4] == 9, have_ep = false;
     for (int p = 0; p + 2 <= total && cfg[p] >= 2; p += cfg[p]) {
         uint8_t *x = cfg + p;
         if (x[1] == 4) {                          /* interface */
             cur_iface = x[2];
-            cur_is_kbd = x[5] == 3 && x[6] == 1 && x[7] == 1;
+            cur_kind = x[5] == 3 && x[6] == 1 && (x[7] == 1 || x[7] == 2) ? x[7] : 0;
+            have_ep = false;
             if (x[5] == 9)
                 hub = true;
-        } else if (x[1] == 5 && cur_is_kbd && kb_iface < 0 && (x[2] & 0x80) && (x[3] & 3) == 3) {
-            kb_iface = cur_iface;
-            kb_ep = x[2];
-            kb_mps = (x[4] | (x[5] << 8)) & 0x7FF;
-            kb_ival = x[6];
+        } else if (x[1] == 5 && cur_kind && !have_ep && nfound < 2 && (x[2] & 0x80) && (x[3] & 3) == 3) {
+            found[nfound++] = (typeof(found[0])){ cur_kind, cur_iface, x[2], (x[4] | (x[5] << 8)) & 0x7FF, x[6] };
+            have_ep = true;
         }
     }
     if (control(d, 0x00, 9, cfg[5], 0, 0, NULL))  /* SET_CONFIGURATION */
         return d;
 
-    if (kb_iface >= 0 && setup_keyboard(d, kb_iface, kb_ep, kb_mps, kb_ival))
-        keyboards++;
-    else if (hub && speed <= 3 && d->depth < 4)
+    for (int i = 0; i < nfound; i++)
+        if (setup_hid(d, found[i].kind, found[i].iface, found[i].ep, found[i].mps, found[i].ival))
+            found[i].kind == HID_KEYBOARD ? keyboards++ : mice++;
+    if (!nfound && hub && speed <= 3 && d->depth < 4)
         setup_hub(d);
     return d;
 }
@@ -697,6 +712,11 @@ int usb_init(bool force)
 int usb_controllers(void)
 {
     return hc_count;
+}
+
+int usb_mice(void)
+{
+    return mice;
 }
 
 int usb_firmware_controllers(void)

@@ -2,6 +2,12 @@
 #include "kernel.h"
 
 static struct file files[FS_MAX_FILES];
+static uint32_t version = 1;
+
+uint32_t fs_version(void)
+{
+    return version;
+}
 
 bool fs_valid_name(const char *name)
 {
@@ -9,7 +15,7 @@ bool fs_valid_name(const char *name)
     if (!n || n >= FS_NAME_MAX)
         return false;
     for (const char *p = name; *p; p++)
-        if (*p == '/' || *p == ' ' || *p == '>' || (uint8_t)*p < 32)
+        if (*p == '/' || *p == '>' || (uint8_t)*p < 32)
             return false;
     return true;
 }
@@ -53,6 +59,8 @@ bool fs_write(const char *name, const char *data, size_t len, bool append)
     f->data = buf;
     f->size = keep + len;
     f->used = true;
+    f->trashed = false;
+    version++;
     return true;
 }
 
@@ -63,7 +71,28 @@ bool fs_delete(const char *name)
         return false;
     kfree(f->data);
     memset(f, 0, sizeof *f);
+    version++;
     return true;
+}
+
+bool fs_trash(const char *name, bool trashed)
+{
+    struct file *f = fs_find(name);
+    if (!f)
+        return false;
+    f->trashed = trashed;
+    version++;
+    return true;
+}
+
+void fs_empty_trash(void)
+{
+    for (int i = 0; i < FS_MAX_FILES; i++)
+        if (files[i].used && files[i].trashed) {
+            kfree(files[i].data);
+            memset(&files[i], 0, sizeof files[i]);
+        }
+    version++;
 }
 
 bool fs_rename(const char *from, const char *to)
@@ -72,6 +101,7 @@ bool fs_rename(const char *from, const char *to)
     if (!f || !fs_valid_name(to) || fs_find(to))
         return false;
     str_copy(f->name, to, sizeof f->name);
+    version++;
     return true;
 }
 
@@ -88,7 +118,7 @@ int fs_count(void)
 {
     int n = 0;
     for (int i = 0; i < FS_MAX_FILES; i++)
-        n += files[i].used;
+        n += files[i].used && !files[i].trashed;
     return n;
 }
 

@@ -27,7 +27,7 @@ static const char keypad[] = "789-456+1230.";   /* scancodes 0x47..0x53 */
 static struct key queue[QUEUE];
 static volatile int q_head, q_tail;
 
-static bool shift_l, shift_r, ctrl, alt, caps, numlock = true, ru;
+static bool shift_l, shift_r, ctrl, alt, super, caps, numlock = true, ru;
 static bool e0;
 static int skip;                                  /* bytes of a Pause sequence */
 
@@ -70,7 +70,18 @@ static bool is_letter(uint32_t cp)
 
 static uint8_t mods(void)
 {
-    return ((shift_l || shift_r) ? MOD_SHIFT : 0) | (ctrl ? MOD_CTRL : 0) | (alt ? MOD_ALT : 0);
+    return ((shift_l || shift_r) ? MOD_SHIFT : 0) | (ctrl ? MOD_CTRL : 0) | (alt ? MOD_ALT : 0) |
+           (super ? MOD_SUPER : 0);
+}
+
+uint8_t kbd_mods(void)
+{
+    return mods();
+}
+
+void kbd_set_layout_ru(bool on)
+{
+    ru = on;
 }
 
 static void handle(uint8_t b)
@@ -115,6 +126,13 @@ static void handle(uint8_t b)
         if (!release && !alt && shift)
             ru = !ru;
         alt = !release;
+        return;
+    }
+    if (ext && (sc == 0x5B || sc == 0x5C)) {      /* Windows keys: the "Cmd" key */
+        bool was = super;
+        super = !release;
+        if (!release && !was)
+            push((struct key){ KEY_SUPER, mods(), 0x80 | sc, 0 });
         return;
     }
     if (release)
@@ -200,29 +218,30 @@ static void handle(uint8_t b)
     push(k);
 }
 
-/* Read one byte if the controller has keyboard data waiting. */
-static void service(void)
+/* Read one byte if the controller has data waiting (keyboard or mouse). */
+void ps2_service(void)
 {
     uint8_t st = inb(0x64);
     if (!(st & 1))
         return;
     uint8_t b = inb(0x60);
     if (st & 0x20)
-        return;                                   /* mouse data */
-    handle(b);
+        mouse_ps2_byte(b);
+    else
+        handle(b);
 }
 
 static void kbd_irq(struct regs *r)
 {
     (void)r;
-    service();
+    ps2_service();
 }
 
 void kbd_poll(void)
 {
     uint64_t f = irq_save();
     for (int i = 0; i < 16 && (inb(0x64) & 1); i++)
-        service();
+        ps2_service();
     irq_restore(f);
     usb_poll();
 }

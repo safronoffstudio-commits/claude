@@ -26,7 +26,7 @@ static void logo_line(int i, char *out)
 
 void app_neofetch(void)
 {
-    char info[14][96];
+    char info[16][96];
     int n = 0;
     uint64_t up = timer_ms() / 1000;
     snprintf(info[n++], 96, "бро@BroOS");
@@ -36,11 +36,16 @@ void app_neofetch(void)
     snprintf(info[n++], 96, "Загрузка:  GRUB -> Multiboot2 -> long mode (%s)", boot.efi ? "UEFI" : "BIOS");
     snprintf(info[n++], 96, "Аптайм:    %lu ч %lu мин %lu с", up / 3600, up / 60 % 60, up % 60);
     snprintf(info[n++], 96, "Шелл:      brosh");
+    if (desktop_mode)
+        snprintf(info[n++], 96, "Оболочка:  рабочий стол BroOS (Dock, окна)");
     if (scr.graphics)
         snprintf(info[n++], 96, "Экран:     %ux%u, %u бит", scr.width, scr.height, boot.fb_bpp);
     else
         snprintf(info[n++], 96, "Экран:     текстовый режим VGA");
-    snprintf(info[n++], 96, "Терминал:  %dx%d, шрифт Terminus", scr.cols, scr.rows);
+    if (desktop_mode)
+        snprintf(info[n++], 96, "Терминал:  окно на рабочем столе BroOS");
+    else
+        snprintf(info[n++], 96, "Терминал:  %dx%d, шрифт Terminus", scr.cols, scr.rows);
     snprintf(info[n++], 96, "CPU:       %s", cpu_brand());
     snprintf(info[n++], 96, "Память:    %lu МБ занято / %lu МБ", mm_heap_used() >> 20, mm_total_ram() >> 20);
     snprintf(info[n++], 96, "Файлы:     %d в BroFS (RAM)", fs_count());
@@ -112,7 +117,7 @@ static void block(int gx, int gy, uint32_t c)
 
 static int snake_best;
 
-void app_snake(void)
+void text_snake(void)
 {
     int gw = (scr.cols - 2) / 2, gh = scr.rows - 3;
     if (gw < 10 || gh < 8) {
@@ -305,7 +310,7 @@ static bool mandel_render(int64_t cx, int64_t cy, int64_t step, int maxit, struc
     return false;
 }
 
-void app_mandel(void)
+void text_mandel(void)
 {
     if (!scr.graphics) {
         kprintf("Фракталу нужен графический режим, а сейчас текстовый.\n");
@@ -360,7 +365,7 @@ void app_mandel(void)
 
 /* ---- matrix rain ---- */
 
-void app_matrix(void)
+void text_matrix(void)
 {
     static const char charset[] = "0123456789ABCDEFXYZ@#$%&*+=<>БРОСЖЯФЦЭЮЪЩ";
     uint32_t cps[64];

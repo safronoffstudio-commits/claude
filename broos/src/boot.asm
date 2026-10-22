@@ -150,6 +150,18 @@ long_mode_entry:
     mov fs, ax
     mov gs, ax
     mov rsp, stack_top
+
+    ; Enable SSE: the desktop uses floating point. Interrupt entry saves
+    ; and restores the FPU/SSE state (see isr.asm).
+    mov rax, cr0
+    and ax, 0xFFFB              ; clear EM
+    or ax, 0x2                  ; set MP
+    mov cr0, rax
+    mov rax, cr4
+    or ax, (1 << 9) | (1 << 10) ; OSFXSR | OSXMMEXCPT
+    mov cr4, rax
+    fninit
+
     mov edi, edi                ; zero-extend magic
     mov esi, esi                ; zero-extend info pointer
     call kmain

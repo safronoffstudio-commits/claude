@@ -6,7 +6,7 @@
 #include <stdarg.h>
 
 #define BROOS_NAME    "BroOS"
-#define BROOS_VERSION "1.0"
+#define BROOS_VERSION "2.0"
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -76,6 +76,7 @@ void rand_seed(uint64_t s);
 uint64_t rand_u64(void);
 uint32_t rand_range(uint32_t n);
 bool parse_i64(const char *s, int64_t *out);
+void dbg(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 /* ---- mb2.c: multiboot2 boot information ---- */
 #define MMAP_MAX 128
@@ -125,6 +126,8 @@ void gfx_init(void);
 void gfx_pixel(int x, int y, uint32_t c);
 void gfx_fill(int x, int y, int w, int h, uint32_t c);
 void gfx_flush(void);
+uint32_t *gfx_backbuffer(void);
+void gfx_mark(int x, int y, int w, int h);
 void scr_put(int col, int row, uint32_t cp, uint32_t fg, uint32_t bg);
 void scr_text(int col, int row, const char *s, uint32_t fg, uint32_t bg);
 void scr_fill_row(int row, int from_col, uint32_t fg, uint32_t bg);
@@ -186,10 +189,12 @@ enum {
     KEY_HOME, KEY_END, KEY_PGUP, KEY_PGDN, KEY_INS, KEY_DEL,
     KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6,
     KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12,
+    KEY_SUPER,                   /* Windows key pressed alone */
 };
 #define MOD_SHIFT 1
 #define MOD_CTRL  2
 #define MOD_ALT   4
+#define MOD_SUPER 8
 struct key {
     uint16_t code;               /* KEY_* */
     uint8_t mods;
@@ -201,11 +206,26 @@ void kbd_poll(void);
 bool kbd_get(struct key *k);
 struct key kbd_wait(void);
 bool kbd_layout_ru(void);
+void kbd_set_layout_ru(bool on);
+uint8_t kbd_mods(void);
 void kbd_inject(uint8_t sc, bool ext, bool release);
+void ps2_service(void);
+
+/* ---- mouse.c ---- */
+struct mouse_event {
+    int dx, dy, wheel;           /* dy > 0: down; wheel > 0: towards the user */
+    uint8_t buttons;             /* bit 0 left, 1 right, 2 middle */
+};
+bool mouse_init(void);
+bool mouse_has_wheel(void);
+void mouse_report(int dx, int dy, int wheel, int buttons);
+void mouse_ps2_byte(uint8_t b);
+bool mouse_get(struct mouse_event *e);
 
 /* ---- usb.c: xHCI + HID boot keyboards ---- */
 int usb_init(bool force);        /* returns number of keyboards found */
 int usb_controllers(void);       /* xHCI controllers driven by BroOS */
+int usb_mice(void);
 int usb_firmware_controllers(void);  /* left to the firmware (BIOS legacy emulation) */
 void usb_poll(void);
 bool cmdline_has(const char *word);
@@ -225,10 +245,11 @@ const char *cpu_brand(void);
 const char *cpu_vendor(void);
 
 /* ---- fs.c: in-memory file system ---- */
-#define FS_NAME_MAX 32
+#define FS_NAME_MAX 64
 #define FS_MAX_FILES 128
 struct file {
     bool used;
+    bool trashed;                /* in the desktop's Trash */
     char name[FS_NAME_MAX];
     char *data;
     size_t size;
@@ -242,13 +263,30 @@ bool fs_rename(const char *from, const char *to);
 bool fs_valid_name(const char *name);
 size_t fs_total_bytes(void);
 int fs_count(void);
+bool fs_trash(const char *name, bool trashed);
+void fs_empty_trash(void);
+uint32_t fs_version(void);       /* bumps on every change */
+const char *con_log(void);
+struct con_sink {
+    void (*putc)(void *ctx, uint32_t cp, uint32_t fg);
+    void (*clear)(void *ctx);
+    int cols;
+    void *ctx;
+};
+void con_set_sink(struct con_sink *s);
+struct con_sink *con_get_sink(void);
+extern struct con_sink con_log_sink;
+void shell_execute(const char *line);
+const char *shell_complete(const char *prefix);
+extern bool desktop_mode;
+void gui_redraw_all(void);
 
 /* ---- apps ---- */
 void shell_run(void);
 int edit_file(const char *name);
-void app_snake(void);
-void app_mandel(void);
-void app_matrix(void);
+void text_snake(void);
+void text_mandel(void);
+void text_matrix(void);
 void app_neofetch(void);
 
 /* ---- panic ---- */

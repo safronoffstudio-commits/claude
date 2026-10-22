@@ -1,5 +1,5 @@
-/* brosh - the BroOS shell. */
-#include "kernel.h"
+/* brosh - the BroOS shell (text mode and the desktop Terminal). */
+#include "gui.h"
 
 #define LINE_MAX 256
 #define HISTORY 32
@@ -432,7 +432,7 @@ static void cmd_ls(int argc, char **argv, const char *rest)
     int n = 0;
     for (int i = 0; i < FS_MAX_FILES; i++) {
         struct file *f = fs_at(i);
-        if (!f)
+        if (!f || f->trashed)
             continue;
         con_color(theme->accent2);
         kprintf("  %-28s", f->name);
@@ -474,7 +474,10 @@ static void cmd_edit(int argc, char **argv, const char *rest)
         err("использование: edit <файл>");
         return;
     }
-    edit_file(argv[1]);
+    if (desktop_mode)
+        app_launch("text", argv[1]);
+    else
+        edit_file(argv[1]);
 }
 
 static void cmd_rm(int argc, char **argv, const char *rest)
@@ -656,9 +659,69 @@ static void cmd_panic(int argc, char **argv, const char *rest)
     con_reset_color();
 }
 
-static void cmd_snake(int argc, char **argv, const char *rest) { (void)argc, (void)argv, (void)rest; app_snake(); }
-static void cmd_mandel(int argc, char **argv, const char *rest) { (void)argc, (void)argv, (void)rest; app_mandel(); }
-static void cmd_matrix(int argc, char **argv, const char *rest) { (void)argc, (void)argv, (void)rest; app_matrix(); }
+static void cmd_snake(int argc, char **argv, const char *rest)
+{
+    (void)argc, (void)argv, (void)rest;
+    if (desktop_mode)
+        app_launch("snake", NULL);
+    else
+        text_snake();
+}
+
+static void cmd_mandel(int argc, char **argv, const char *rest)
+{
+    (void)argc, (void)argv, (void)rest;
+    if (desktop_mode)
+        app_launch("fractal", NULL);
+    else
+        text_mandel();
+}
+
+static void cmd_matrix(int argc, char **argv, const char *rest)
+{
+    (void)argc, (void)argv, (void)rest;
+    if (desktop_mode)
+        err("matrix занимает весь экран, поэтому работает только в текстовом режиме (параметр загрузки text).");
+    else
+        text_matrix();
+}
+
+static void cmd_dmesg(int argc, char **argv, const char *rest)
+{
+    (void)argc, (void)argv, (void)rest;
+    con_write(con_log());
+}
+
+static void cmd_open(int argc, char **argv, const char *rest)
+{
+    (void)argc, (void)argv;
+    if (!desktop_mode) {
+        err("open работает на рабочем столе.");
+        return;
+    }
+    for (int i = 0; i < app_count; i++)
+        if (*rest && (!strcmp(rest, all_apps[i]->id) || !strcmp(rest, all_apps[i]->name))) {
+            app_launch(all_apps[i]->id, NULL);
+            return;
+        }
+    if (*rest && fs_find(rest)) {
+        app_launch("text", rest);
+        return;
+    }
+    con_write("Использование: open <программа или файл>. Программы:");
+    for (int i = 0; i < app_count; i++)
+        kprintf(" %s", all_apps[i]->id);
+    con_write("\n");
+}
+
+static void cmd_exit(int argc, char **argv, const char *rest)
+{
+    (void)argc, (void)argv, (void)rest;
+    if (desktop_mode && win_focused())
+        win_close(win_focused());
+    else
+        con_write("Бро, из ОС не выходят. Можно только shutdown.\n");
+}
 static void cmd_neofetch(int argc, char **argv, const char *rest) { (void)argc, (void)argv, (void)rest; app_neofetch(); }
 
 static void cmd_uname(int argc, char **argv, const char *rest)
@@ -714,6 +777,9 @@ static const struct command commands[] = {
     { "mandel",   "",             "фрактал Мандельброта", cmd_mandel },
     { "matrix",   "",             "ты в матрице, бро", cmd_matrix },
     { "beep",     "[Гц] [мс]",    "пискнуть PC-спикером", cmd_beep },
+    { "open",     "<программа>",  "открыть программу рабочего стола", cmd_open },
+    { "dmesg",    "",             "журнал загрузки", cmd_dmesg },
+    { "exit",     "",             "закрыть терминал", cmd_exit },
     { "uname",    "",             "версия системы", cmd_uname },
     { "whoami",   "",             "кто я", cmd_whoami },
     { "panic",    "",             "показать синий экран (тест)", cmd_panic },
@@ -737,7 +803,7 @@ static const struct command hidden[] = {
     { "cls", "", "", cmd_clear },
 };
 
-static void execute(char *line)
+void shell_execute(const char *line)
 {
     while (*line == ' ')
         line++;
@@ -774,6 +840,22 @@ static void execute(char *line)
     err("бро, команды '%s' нет. Набери help.", argv[0]);
 }
 
+/* Unique command completing `prefix`, or NULL. */
+const char *shell_complete(const char *prefix)
+{
+    const char *found = NULL;
+    size_t n = strlen(prefix);
+    if (!n || strchr(prefix, ' '))
+        return NULL;
+    for (int i = 0; i < command_count; i++)
+        if (!strncmp(commands[i].name, prefix, n)) {
+            if (found)
+                return NULL;
+            found = commands[i].name;
+        }
+    return found;
+}
+
 void shell_run(void)
 {
     app_neofetch();
@@ -796,6 +878,6 @@ void shell_run(void)
             }
             str_copy(history[hist_count++], l.buf, LINE_MAX);
         }
-        execute(l.buf);
+        shell_execute(l.buf);
     }
 }

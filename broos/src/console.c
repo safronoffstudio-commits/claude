@@ -31,7 +31,37 @@ static uint64_t blink_at;
 
 #define TOP 1                   /* first screen row used by the console */
 
-int con_cols(void) { return cols; }
+static struct con_sink *sink;
+static char logbuf[16384];
+static size_t loglen;
+
+static void log_putc(void *ctx, uint32_t cp, uint32_t fg)
+{
+    (void)ctx, (void)fg;
+    char e[4];
+    int n = utf8_encode(cp, e);
+    if (loglen + n < sizeof logbuf - 1) {
+        memcpy(logbuf + loglen, e, n);
+        loglen += n;
+        logbuf[loglen] = 0;
+    }
+}
+
+static void log_clear(void *ctx)
+{
+    (void)ctx;
+}
+
+/* Boot messages are kept here while the desktop owns the screen. */
+struct con_sink con_log_sink = { log_putc, log_clear, 100, NULL };
+
+const char *con_log(void) { return logbuf; }
+
+/* Redirect console output (the desktop terminal, the boot log). */
+void con_set_sink(struct con_sink *s) { sink = s; }
+struct con_sink *con_get_sink(void) { return sink; }
+
+int con_cols(void) { return sink ? sink->cols : cols; }
 
 static void draw_cell(int x, int y)
 {
@@ -77,6 +107,10 @@ static void scroll(void)
 
 void con_putc(uint32_t cp)
 {
+    if (sink) {
+        sink->putc(sink->ctx, cp, cur_fg);
+        return;
+    }
     cursor_hide();
     if (cp == '\n') {
         cx = 0;
@@ -129,6 +163,10 @@ void con_reset_color(void) { cur_fg = theme->fg; }
 
 void con_clear(void)
 {
+    if (sink) {
+        sink->clear(sink->ctx);
+        return;
+    }
     cursor_hide();
     for (int i = 0; i < cols * rows; i++)
         text[i] = (struct ccell){ ' ', theme->fg };
@@ -139,6 +177,8 @@ void con_clear(void)
 /* Repaint everything (after a theme change or a full-screen app). */
 void con_redraw(void)
 {
+    if (sink)
+        return;
     cursor_drawn = false;
     scr_clear(theme->bg);
     for (int y = 0; y < rows; y++)
@@ -167,6 +207,8 @@ void con_clear_eol(void)
 
 void con_cursor(bool on)
 {
+    if (sink)
+        return;
     cursor_on = on;
     if (on) {
         blink_at = timer_ms() + 530;
