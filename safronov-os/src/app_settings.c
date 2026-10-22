@@ -213,7 +213,7 @@ static void settings_draw(struct window *w, struct canvas *c)
 {
     struct settings_ui *s = w->data;
     s->nhot = 0;
-    fill_rect(c, 0, 0, SIDE, w->h, OPAQUE(pal.sidebar_bg));
+    mica_fill(c, w, 0, 0, SIDE, w->h, pal.dark ? ARGB(205, 30, 32, 44) : ARGB(178, 236, 240, 252));
     fill_rrect_px(c, SIDE * c->s - 1, 0, 1, w->h * c->s, 0, OPAQUE(pal.separator));
     ui_search_field(c, 12, 40, SIDE - 24, s->search.buf, "Поиск");
     if (s->search_focus)
@@ -350,7 +350,7 @@ static void settings_launch(const char *arg)
         return;
     if (arg && !strcmp(arg, "about"))
         s->pane = P_ABOUT;
-    struct window *w = win_open(&app_settings, "Настройки", 720, 500, WF_CUSTOM_TITLE | WF_HIDE_TITLE | WF_NO_ZOOM);
+    struct window *w = win_open(&app_settings, "Настройки", 720, 500, WF_CUSTOM_TITLE | WF_HIDE_TITLE | WF_NO_ZOOM | WF_MICA);
     if (!w) {
         kfree(s);
         return;

@@ -391,43 +391,56 @@ def icon_bro():
     return img
 
 
-# ---- Windows 11 style folders, drive and "This PC" --------------------------
+# ---- folders (macOS Big Sur style), disk, Recycle Bin, "This PC" -----------
 
-def folder(badge=None):
+FOLDER_COLORS = {
+    "blue": ("#3D8FEF", "#8CCBFF", "#4BA0F6"),
+    "pink": ("#E5476E", "#FF94AE", "#F2587C"),
+    "purple": ("#7650E0", "#B39BFF", "#8665EE"),
+}
+
+
+def folder(glyph=None, color="blue"):
+    back_c, top_c, bot_c = FOLDER_COLORS[color]
     img = Image.new("RGBA", (SS, SS), (0, 0, 0, 0))
     back = Image.new("L", (SS, SS), 0)
     db = ImageDraw.Draw(back)
-    db.rounded_rectangle((52, 112, 460, 420), 30, fill=255)
-    db.rounded_rectangle((52, 84, 222, 170), 28, fill=255)
+    db.rounded_rectangle((44, 96, 468, 424), 34, fill=255)
+    db.rounded_rectangle((44, 70, 214, 150), 30, fill=255)
     front = Image.new("L", (SS, SS), 0)
-    ImageDraw.Draw(front).rounded_rectangle((52, 160, 460, 424), 30, fill=255)
-    sh = Image.new("RGBA", (SS, SS), (90, 60, 0, 0))
-    sh.putalpha(ImageChops_max(back, front).filter(ImageFilter.GaussianBlur(9)).point(lambda v: int(v * 0.28)))
-    img.alpha_composite(sh, (0, 9))
-    bl = vgrad(SS, SS, hexc("#E9A41A"), hexc("#C98200"))
+    ImageDraw.Draw(front).rounded_rectangle((44, 142, 468, 430), 34, fill=255)
+    sh = Image.new("RGBA", (SS, SS), (10, 40, 110, 0))
+    sh.putalpha(ImageChops_max(back, front).filter(ImageFilter.GaussianBlur(10)).point(lambda v: int(v * 0.30)))
+    img.alpha_composite(sh, (0, 10))
+    bl = vgrad(SS, SS, hexc(back_c), hexc(back_c))
     bl.putalpha(back)
     img.alpha_composite(bl)
-    # a sheet of paper peeking out
-    paper = Image.new("L", (SS, SS), 0)
-    ImageDraw.Draw(paper).rounded_rectangle((84, 132, 428, 260), 14, fill=255)
-    pl = vgrad(SS, SS, hexc("#FFFFFF"), hexc("#EDEDED"))
-    pl.putalpha(paper)
-    img.alpha_composite(pl)
-    fs = Image.new("RGBA", (SS, SS), (120, 80, 0, 0))
-    fs.putalpha(front.filter(ImageFilter.GaussianBlur(6)).point(lambda v: int(v * 0.25)))
-    img.alpha_composite(fs, (0, -5))
-    fl = vgrad(SS, SS, hexc("#FFD866"), hexc("#F7B92B"))
+    # the inner lip of the back panel
+    lip = Image.new("L", (SS, SS), 0)
+    ImageDraw.Draw(lip).rounded_rectangle((58, 112, 454, 170), 20, fill=255)
+    ll = Image.new("RGBA", (SS, SS), (255, 255, 255, 0))
+    ll.putalpha(lip.point(lambda v: int(v * 0.35)))
+    img.alpha_composite(ll)
+    fl = vgrad(SS, SS, hexc(top_c), hexc(bot_c))
     fl.putalpha(front)
     img.alpha_composite(fl)
-    rim = Image.new("L", (SS, SS), 0)
-    ImageDraw.Draw(rim).rounded_rectangle((52, 160, 460, 424), 30, outline=255, width=3)
-    rl = Image.new("RGBA", (SS, SS), (255, 240, 200, 0))
-    top = np.asarray(rim, np.float32)
-    top[200:, :] *= 0.0
-    rl.putalpha(Image.fromarray((top * 0.8).astype(np.uint8)))
-    img.alpha_composite(rl)
-    if badge:
-        badge(ImageDraw.Draw(img), img)
+    # a soft highlight along the top edge of the front
+    edge = Image.new("L", (SS, SS), 0)
+    ImageDraw.Draw(edge).rounded_rectangle((44, 142, 468, 430), 34, outline=255, width=4)
+    e = np.asarray(edge, np.float32)
+    e[190:, :] = 0
+    hl = Image.new("RGBA", (SS, SS), (255, 255, 255, 0))
+    hl.putalpha(Image.fromarray((e * 0.7).astype(np.uint8)))
+    img.alpha_composite(hl)
+    if glyph:
+        g = Image.new("L", (SS, SS), 0)
+        glyph(ImageDraw.Draw(g))
+        shade = Image.new("RGBA", (SS, SS), (20, 50, 120, 0))
+        shade.putalpha(g.point(lambda v: int(v * 0.28)))
+        img.alpha_composite(shade, (0, 5))
+        white = Image.new("RGBA", (SS, SS), (255, 255, 255, 0))
+        white.putalpha(g.point(lambda v: int(v * 0.92)))
+        img.alpha_composite(white)
     return img
 
 
@@ -435,60 +448,95 @@ def ImageChops_max(a, b):
     return Image.fromarray(np.maximum(np.asarray(a), np.asarray(b)))
 
 
-def badge_desktop(d, img):
-    d.rounded_rectangle((176, 236, 336, 344), 14, fill=hexc("#2F7CF6"))
-    d.rounded_rectangle((186, 246, 326, 322), 6, fill=hexc("#7FB6FF"))
-    d.rectangle((240, 344, 272, 366), fill=hexc("#2F7CF6"))
-    d.rounded_rectangle((212, 362, 300, 376), 6, fill=hexc("#2F7CF6"))
+def glyph_docs(d):
+    d.rounded_rectangle((206, 214, 306, 352), 12, outline=255, width=12)
+    for y in (252, 280, 308):
+        d.rounded_rectangle((228, y, 284, y + 9), 4, fill=255)
 
 
-def badge_docs(d, img):
-    d.rounded_rectangle((196, 222, 316, 382), 12, fill=hexc("#FFFFFF"), outline=hexc("#D9DCE3"), width=3)
-    for i, y in enumerate(range(252, 362, 24)):
-        d.rounded_rectangle((218, y, 294 - (26 if i == 4 else 0), y + 9), 4, fill=hexc("#3B82F6" if i == 0 else "#A8B3C7"))
+def glyph_pictures(d):
+    d.rounded_rectangle((188, 222, 324, 340), 14, outline=255, width=12)
+    d.polygon([(200, 330), (240, 280), (266, 310), (284, 292), (314, 330)], fill=255)
+    d.ellipse((282, 240, 304, 262), fill=255)
 
 
-def badge_downloads(d, img):
-    d.ellipse((190, 232, 322, 364), fill=hexc("#1FAA59"))
-    thick_line(d, [(256, 260), (256, 330)], 18, hexc("#FFFFFF"))
-    thick_line(d, [(222, 300), (256, 334), (290, 300)], 18, hexc("#FFFFFF"))
+def glyph_music(d):
+    d.rectangle((262, 222, 276, 316), fill=255)
+    d.polygon([(262, 222), (318, 208), (318, 238), (276, 250)], fill=255)
+    d.ellipse((222, 296, 278, 340), fill=255)
 
 
-def badge_pictures(d, img):
-    d.rounded_rectangle((180, 236, 332, 360), 14, fill=hexc("#2D9CFF"))
-    d.ellipse((286, 252, 314, 280), fill=hexc("#FFE680"))
-    d.polygon([(184, 356), (232, 292), (262, 330), (282, 308), (328, 356)], fill=hexc("#FFFFFF"))
+def glyph_videos(d):
+    d.rounded_rectangle((186, 226, 326, 336), 14, outline=255, width=12)
+    d.polygon([(240, 252), (240, 312), (288, 282)], fill=255)
 
 
-def badge_music(d, img):
-    d.ellipse((190, 232, 322, 364), fill=hexc("#FF7A2F"))
-    d.rectangle((262, 262, 276, 330), fill=hexc("#FFFFFF"))
-    d.polygon([(262, 262), (304, 250), (304, 276), (276, 284)], fill=hexc("#FFFFFF"))
-    d.ellipse((228, 312, 274, 346), fill=hexc("#FFFFFF"))
+def glyph_downloads(d):
+    thick_line(d, [(256, 214), (256, 312)], 20, 255)
+    thick_line(d, [(214, 274), (256, 316), (298, 274)], 20, 255)
+    thick_line(d, [(206, 346), (306, 346)], 16, 255)
 
 
-def badge_videos(d, img):
-    d.rounded_rectangle((180, 240, 332, 356), 16, fill=hexc("#8B5CF6"))
-    d.polygon([(238, 268), (238, 328), (290, 298)], fill=hexc("#FFFFFF"))
+def glyph_desktop(d):
+    d.rounded_rectangle((192, 222, 320, 312), 12, outline=255, width=12)
+    d.rectangle((248, 312, 264, 334), fill=255)
+    d.rounded_rectangle((222, 332, 290, 344), 6, fill=255)
 
 
 def icon_drive():
+    """A silver internal disk."""
     img = Image.new("RGBA", (SS, SS), (0, 0, 0, 0))
     body = Image.new("L", (SS, SS), 0)
-    ImageDraw.Draw(body).rounded_rectangle((60, 176, 452, 372), 34, fill=255)
+    ImageDraw.Draw(body).rounded_rectangle((56, 168, 456, 356), 36, fill=255)
     sh = Image.new("RGBA", (SS, SS), (0, 0, 0, 0))
-    sh.putalpha(body.filter(ImageFilter.GaussianBlur(10)).point(lambda v: int(v * 0.30)))
-    img.alpha_composite(sh, (0, 12))
-    bl = vgrad(SS, SS, hexc("#FBFBFD"), hexc("#B9BDC8"))
+    sh.putalpha(body.filter(ImageFilter.GaussianBlur(12)).point(lambda v: int(v * 0.32)))
+    img.alpha_composite(sh, (0, 14))
+    bl = vgrad(SS, SS, hexc("#F4F5F8"), hexc("#AEB3BF"))
     bl.putalpha(body)
     img.alpha_composite(bl)
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((60, 300, 452, 372), 34, fill=hexc("#8F95A3"))
-    d.rectangle((60, 300, 452, 320), fill=hexc("#8F95A3"))
-    d.line([(92, 300), (420, 300)], fill=hexc("#E6E8EE"), width=3)
-    d.ellipse((384, 326, 404, 346), fill=hexc("#38E07B"))
-    tile = icon_bro().resize((120, 120), Image.LANCZOS)
-    img.alpha_composite(tile, (88, 176))
+    face = Image.new("L", (SS, SS), 0)
+    ImageDraw.Draw(face).rounded_rectangle((56, 262, 456, 356), 36, fill=255)
+    ImageDraw.Draw(face).rectangle((56, 262, 456, 300), fill=255)
+    fc = vgrad(SS, SS, hexc("#9AA0AD"), hexc("#7D8492"))
+    fc.putalpha(face)
+    img.alpha_composite(fc)
+    d.line([(80, 262), (432, 262)], fill=hexc("#E9EBF0"), width=3)
+    for i in range(6):
+        x = 104 + i * 26
+        d.rounded_rectangle((x, 292, x + 12, 330), 6, fill=hexc("#5E6573"))
+    d.ellipse((392, 300, 414, 322), fill=hexc("#5BE38A"))
+    return img
+
+
+def icon_recycle():
+    """A glass recycle bin with blue arrows (the desktop's Корзина)."""
+    img = Image.new("RGBA", (SS, SS), (0, 0, 0, 0))
+    m = Image.new("L", (SS, SS), 0)
+    ImageDraw.Draw(m).polygon([(126, 150), (386, 150), (360, 464), (152, 464)], fill=255)
+    sh = Image.new("RGBA", (SS, SS), (0, 0, 0, 0))
+    sh.putalpha(m.filter(ImageFilter.GaussianBlur(12)).point(lambda v: int(v * 0.28)))
+    img.alpha_composite(sh, (0, 10))
+    body = vgrad(SS, SS, hexc("#FFFFFF", 235), hexc("#D7E6FA", 235))
+    body.putalpha(m.point(lambda v: int(v * 0.90)))
+    img.alpha_composite(body)
+    d = ImageDraw.Draw(img)
+    d.polygon([(126, 150), (386, 150), (360, 464), (152, 464)], outline=hexc("#A9C3E8"), width=4)
+    d.rounded_rectangle((110, 118, 402, 160), 18, fill=hexc("#F2F6FC"), outline=hexc("#A9C3E8"), width=4)
+    # three arrows chasing each other
+    cx, cy, r = 256, 312, 82
+    col = hexc("#2F80ED")
+    for k in range(3):
+        a0 = math.radians(-90 + k * 120 + 18)
+        a1 = math.radians(-90 + k * 120 + 102)
+        pts = [(cx + r * math.cos(a0 + (a1 - a0) * t / 12), cy + r * math.sin(a0 + (a1 - a0) * t / 12)) for t in range(13)]
+        thick_line(d, pts, 26, col)
+        ex, ey = pts[-1]
+        ang = a1 + math.pi / 2
+        tip = (ex + 30 * math.cos(ang), ey + 30 * math.sin(ang))
+        left = (ex + 24 * math.cos(ang + 2.3), ey + 24 * math.sin(ang + 2.3))
+        right = (ex + 24 * math.cos(ang - 2.3), ey + 24 * math.sin(ang - 2.3))
+        d.polygon([tip, left, right], fill=col)
     return img
 
 
@@ -650,56 +698,89 @@ def wallpaper(sky, layers, stars=False, seed=1):
 
 
 def bloom(dark, W=1440, H=900):
-    """Flowing translucent sheets in blue and violet (the Safronov OS 'Bloom' wallpaper)."""
+    """Flowing glossy petals in blue, violet and peach: the Safronov OS 'Bloom' wallpaper."""
     yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
     u, v = xx / W, yy / H
+
     def c(h):
         return np.array(hexc(h)[:3], np.float32)
-    S = np.sin
-    if dark:
-        img = mix(c("#1B1F4A"), c("#0B0D24"), v[..., None])
-        glow = np.exp(-(((u - 0.62) / 0.5) ** 2 + ((v - 0.3) / 0.35) ** 2))
-        img = mix(img, c("#3A3F8F"), (glow * 0.5)[..., None])
-        shadow_col = c("#04051A")
-        P = dict(deep="#0E1460", mid="#3A4BD0", rim="#C8D0FF", glow="#B07BE8")
-        P2 = dict(deep="#1A0F55", mid="#6440C8", rim="#E8D6FF", glow="#F29AC0")
-    else:
-        img = mix(c("#E3EAFE"), c("#BAC8F7"), v[..., None])
-        glow = np.exp(-(((u - 0.40) / 0.5) ** 2 + ((v - 0.22) / 0.35) ** 2))
-        img = mix(img, c("#F8FAFF"), (glow * 0.65)[..., None])
-        shadow_col = c("#4A5CC0")
-        P = dict(deep="#1F35B5", mid="#5B7CF2", rim="#FFFFFF", glow="#FFD7E2")
-        P2 = dict(deep="#3B26A8", mid="#8D74F0", rim="#FFF6FA", glow="#FFD9C2")
 
-    def sheet(img, edge, p, twist, shadow):
-        deep, mid, rim, glow_col = c(p["deep"]), c(p["mid"]), c(p["rim"]), c(p["glow"])
-        e = edge(u[0])[None, :]
+    def ramp(stops, t):
+        t = np.clip(t, 0, 1)[..., None]
+        out = np.zeros(t.shape[:-1] + (3,), np.float32) + stops[0][1]
+        for (p0, c0), (p1, c1) in zip(stops, stops[1:]):
+            k = np.clip((t - p0) / (p1 - p0), 0, 1)
+            k = k * k * (3 - 2 * k)
+            out = np.where(t >= p0, mix(c0, c1, k), out)
+        return out
+
+    def spline(pts):
+        px = np.array([p[0] for p in pts], np.float64)
+        py = np.array([p[1] for p in pts], np.float64)
+        m = np.zeros_like(py)
+        m[1:-1] = (py[2:] - py[:-2]) / (px[2:] - px[:-2])
+        m[0] = (py[1] - py[0]) / (px[1] - px[0])
+        m[-1] = (py[-1] - py[-2]) / (px[-1] - px[-2])
+        x = u[0].astype(np.float64)
+        i = np.clip(np.searchsorted(px, x) - 1, 0, len(px) - 2)
+        h = px[i + 1] - px[i]
+        t = np.clip((x - px[i]) / h, 0, 1)
+        y = ((2 * t ** 3 - 3 * t ** 2 + 1) * py[i] + (t ** 3 - 2 * t ** 2 + t) * h * m[i] +
+             (-2 * t ** 3 + 3 * t ** 2) * py[i + 1] + (t ** 3 - t ** 2) * h * m[i + 1])
+        return y.astype(np.float32)
+
+    def sheet(img, pts, stops, thick, warm=None, shadow=0.35, shadow_px=70, rim=0.85, gloss=None):
+        e = spline(pts)
+        slope = np.gradient(e) * W
+        k = np.exp(-np.linspace(-3, 3, 121) ** 2)
+        slope = np.convolve(np.pad(slope, 60, mode="edge"), k / k.sum(), mode="valid")
+        e = e[None, :]
         d = v - e
         inside = d >= 0
-        sh = np.where(d < 0, np.exp(d * H / 45.0), 0) * shadow
-        img = mix(img, shadow_col, sh[..., None])
-        k = np.clip(d / 0.55, 0, 1)
-        tw = (S(twist[0] * u + twist[1]) + 1) / 2
-        col = mix(mid, deep, (k ** 0.7)[..., None])
-        col = mix(col, glow_col, (np.exp(-((d - 0.035 - 0.05 * tw) / 0.045) ** 2) * (0.35 + 0.5 * tw))[..., None])
-        col = mix(col, rim, (np.exp(-(d / 0.010) ** 2) * 0.85)[..., None])
-        a = np.clip(d * H / 1.3, 0, 1)
-        return mix(img, col, np.where(inside, a, 0)[..., None])
+        sh = np.where(d < 0, np.exp(d * H / (shadow_px * H / 1024)), 0) * shadow
+        img = mix(img, c("#16248A"), sh[..., None])
+        t = np.clip(d / thick, 0, 1) ** 0.8
+        col = ramp(stops, t)
+        face = np.clip(0.5 + slope[None, :] * 0.9, 0, 1)
+        col = col * (0.88 + 0.24 * face[..., None])
+        if warm is not None:
+            kk = np.exp(-(d / (thick * 0.30)) ** 2) * face * warm[1]
+            col = mix(col, c(warm[0]), kk[..., None])
+        if gloss is not None:
+            kk = np.exp(-((d - gloss[1] * thick) / (thick * 0.12)) ** 2) * gloss[2]
+            col = mix(col, c(gloss[0]), kk[..., None])
+        col = mix(col, c("#FFFFFF"), (np.exp(-(d * 1024 / 2.0) ** 2) * rim)[..., None])
+        a = np.clip(d * H / 1.2, 0, 1)
+        return mix(img, np.clip(col, 0, 255), np.where(inside, a, 0)[..., None])
 
-    layers = [
-        (lambda x: 0.46 - 0.30 * x + 0.07 * S(5.2 * x + 0.8), P2, (5.0, 1.0), 0.22),
-        (lambda x: 0.66 - 0.42 * x + 0.09 * S(3.6 * x + 2.2), P, (4.0, 2.5), 0.30),
-        (lambda x: 0.58 + 0.05 * x - 0.12 * S(2.8 * x + 0.4), P2, (3.3, 4.0), 0.30),
-        (lambda x: 0.86 - 0.36 * x + 0.06 * S(6.0 * x + 1.3), P, (5.5, 0.3), 0.30),
-        (lambda x: 0.92 - 0.10 * x + 0.05 * S(4.2 * x + 3.1), P2, (4.6, 2.0), 0.30),
-        (lambda x: 1.02 - 0.22 * x + 0.05 * S(3.1 * x + 5.0), P, (3.8, 1.2), 0.30),
-    ]
-    for edge, p, tw, shadow in layers:
-        img = sheet(img, edge, p, tw, shadow)
-    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8), "RGB").filter(ImageFilter.GaussianBlur(1.4))
+    img = ramp([(0, c("#5A8DE8")), (0.5, c("#3D6EDD")), (1, c("#2A4ECB"))], v)
+    glow = np.exp(-(((u - 0.62) / 0.5) ** 2 + ((v - 0.0) / 0.35) ** 2))
+    img = mix(img, c("#86ACF0"), (glow * 0.45)[..., None])
+    img = sheet(img, [(0.38, 1.10), (0.52, 0.40), (0.63, 0.14), (0.74, 0.085), (0.88, 0.14), (1.02, 0.30)],
+                [(0, c("#FFD6BD")), (0.14, c("#F5A8C4")), (0.38, c("#A58BEE")), (0.75, c("#5A6BE4")), (1, c("#3A50D2"))],
+                0.85, warm=("#FFC7A3", 0.55), shadow=0.22, gloss=("#F6B4D9", 0.55, 0.25))
+    img = sheet(img, [(-0.02, 0.24), (0.12, 0.13), (0.26, 0.14), (0.42, 0.30), (0.56, 0.62), (0.66, 0.95), (0.72, 1.2)],
+                [(0, c("#C9DCFF")), (0.10, c("#6E9EF7")), (0.40, c("#2F66EA")), (1, c("#1B3FC0"))],
+                0.55, warm=("#E9C9F5", 0.30), gloss=("#7FB0FF", 0.5, 0.35))
+    img = sheet(img, [(-0.02, 0.50), (0.12, 0.42), (0.28, 0.45), (0.45, 0.62), (0.62, 0.92), (0.70, 1.15)],
+                [(0, c("#A6D2FF")), (0.12, c("#2E86F5")), (0.50, c("#1360DA")), (1, c("#12309F"))],
+                0.45, gloss=("#3E9BFF", 0.45, 0.35))
+    img = sheet(img, [(0.50, 1.15), (0.63, 0.80), (0.76, 0.58), (0.90, 0.50), (1.02, 0.54)],
+                [(0, c("#FFD3CC")), (0.15, c("#E99CD6")), (0.45, c("#8D70EA")), (1, c("#3E3BC6"))],
+                0.55, warm=("#FFBFA8", 0.45), gloss=("#B08CF5", 0.6, 0.3))
+    img = sheet(img, [(-0.02, 0.74), (0.14, 0.66), (0.32, 0.67), (0.52, 0.80), (0.72, 1.0), (0.82, 1.15)],
+                [(0, c("#E0E4FF")), (0.15, c("#9C8DF2")), (0.55, c("#4F48D8")), (1, c("#2E2CB0"))],
+                0.42, warm=("#F4C2E2", 0.35))
+    img = sheet(img, [(0.25, 1.15), (0.45, 0.94), (0.68, 0.86), (0.86, 0.85), (1.02, 0.82)],
+                [(0, c("#EEF0FF")), (0.15, c("#B4BEF7")), (0.6, c("#727FE6")), (1, c("#5260D6"))],
+                0.35, warm=("#F9CDE0", 0.3), rim=0.7)
+    if dark:
+        img = img * np.array([0.40, 0.42, 0.58], np.float32) + c("#06081E") * 0.5
+    blur = 1.6 * W / 1536
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8), "RGB").filter(ImageFilter.GaussianBlur(blur))
 
 
-BLOOM_SIZE = (960, 600)
+BLOOM_SIZE = (1280, 800)
 
 WALLPAPERS = [
     ("Закат", ["#FFE0B0", "#F9A8B8", "#C58BEA"],
@@ -723,11 +804,11 @@ ICONS = [
     ("SNAKE", icon_snake), ("FRACTAL", icon_fractal), ("PAINT", icon_paint), ("SETTINGS", icon_settings),
     ("LAUNCHPAD", icon_launchpad), ("TRASH", lambda: icon_trash(False)), ("TRASH_FULL", lambda: icon_trash(True)),
     ("DOC", icon_doc), ("BRO", icon_bro),
-    ("FOLDER", folder), ("FOLDER_DESKTOP", lambda: folder(badge_desktop)),
-    ("FOLDER_DOCS", lambda: folder(badge_docs)), ("FOLDER_DOWNLOADS", lambda: folder(badge_downloads)),
-    ("FOLDER_PICTURES", lambda: folder(badge_pictures)), ("FOLDER_MUSIC", lambda: folder(badge_music)),
-    ("FOLDER_VIDEOS", lambda: folder(badge_videos)), ("DRIVE", icon_drive), ("COMPUTER", icon_computer),
-    ("PHOTOS", icon_photos), ("PLAYER", icon_player), ("CALENDAR", icon_calendar),
+    ("FOLDER", folder), ("FOLDER_DESKTOP", lambda: folder(glyph_desktop)),
+    ("FOLDER_DOCS", lambda: folder(glyph_docs)), ("FOLDER_DOWNLOADS", lambda: folder(glyph_downloads)),
+    ("FOLDER_PICTURES", lambda: folder(glyph_pictures)), ("FOLDER_MUSIC", lambda: folder(glyph_music, "pink")),
+    ("FOLDER_VIDEOS", lambda: folder(glyph_videos, "purple")), ("DRIVE", icon_drive), ("COMPUTER", icon_computer),
+    ("PHOTOS", icon_photos), ("PLAYER", icon_player), ("CALENDAR", icon_calendar), ("RECYCLE", icon_recycle),
     ("IMAGE_FILE", lambda: page_icon(badge_image_file)), ("AUDIO_FILE", lambda: page_icon(badge_audio_file)),
 ]
 MIPS = [128, 64, 32, 16]
@@ -750,7 +831,7 @@ def main():
     logo_offs = [add(image_blob(logo_mask(s))) for s in LOGOS]
     cur_offs = [add(image_blob(cursor(1))), add(image_blob(cursor(2)))]
     wall_offs, wall_names = [], []
-    blooms = [bloom(dark).resize(BLOOM_SIZE, Image.LANCZOS) for dark in (False, True)]
+    blooms = [bloom(dark, 1920, 1200).resize(BLOOM_SIZE, Image.LANCZOS) for dark in (False, True)]
     if PREVIEW:
         blooms[0].save(os.path.join(PREVIEW, "bloom.png"))
         blooms[1].save(os.path.join(PREVIEW, "bloom_dark.png"))

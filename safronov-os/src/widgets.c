@@ -24,16 +24,6 @@ static int sel_kind = -1;
 static char sel_path[FS_NAME_MAX];
 int wall_luma_left = 0;               /* average brightness behind the icons (desktop.c) */
 
-static bool trash_full(void)
-{
-    for (int i = 0; i < FS_MAX_FILES; i++) {
-        struct file *f = fs_at(i);
-        if (f && f->trashed)
-            return true;
-    }
-    return false;
-}
-
 static void collect_icons(void)
 {
     struct rect area = desktop_area();
@@ -67,7 +57,7 @@ static void icon_info(const struct dicon *d, int *icon, const char **label)
 {
     switch (d->kind) {
     case DI_PC: *icon = ICON_COMPUTER; *label = "Этот компьютер"; break;
-    case DI_TRASH: *icon = trash_full() ? ICON_TRASH_FULL : ICON_TRASH; *label = "Корзина"; break;
+    case DI_TRASH: *icon = ICON_RECYCLE; *label = "Корзина"; break;
     case DI_DOCS: *icon = ICON_FOLDER_DOCS; *label = "Документы"; break;
     default: *icon = file_icon(d->path); *label = fs_base(d->path); break;
     }
@@ -221,11 +211,14 @@ bool desk_mouse(const struct mevent *e)
 
 /* ---- widgets ---- */
 
-#define WW 292
+#define WW 254
 enum { W_CLOCK, W_CAL, W_PLAYER };
-static const int card_h[WIDGET_COUNT] = { 128, 240, 124 };
+static const int card_h[WIDGET_COUNT] = { 122, 184, 122 };
 static int player_hot = -1;            /* hovered player button */
 static struct rect pbtn[3];
+
+#define TXT  0xFFFFFFFF
+#define TXT2 ARGB(185, 255, 255, 255)
 
 static bool widgets_on(void)
 {
@@ -237,7 +230,7 @@ struct rect widget_card(int i)
     if (!widgets_on())
         return (struct rect){ 0, 0, 0, 0 };
     struct rect area = desktop_area();
-    int y = area.y + 14;
+    int y = area.y + 12;
     for (int k = 0; k < i; k++)
         y += card_h[k] + 12;
     if (y + card_h[i] > area.y + area.h - 8)
@@ -251,173 +244,175 @@ struct rect widgets_bounds(void)
     return (struct rect){ gui_screen_w() - WW - 40, area.y, WW + 40, area.h };
 }
 
+/* Deep blue glass, white text: the widget cards. */
 static void card(struct canvas *c, struct rect r)
 {
-    draw_shadow(c, r.x, r.y + 4, r.w, r.h, 16, 14, pal.dark ? 70 : 34);
-    vibrancy(c, r.x, r.y, r.w, r.h, 16, pal.glass_tint, 3);
-    stroke_rrect(c, r.x, r.y, r.w, r.h, 16, pal.glass_line);
+    draw_shadow(c, r.x, r.y + 6, r.w, r.h, 16, 16, pal.dark ? 80 : 50);
+    vibrancy(c, r.x, r.y, r.w, r.h, 16, pal.dark ? ARGB(190, 22, 28, 64) : ARGB(160, 42, 70, 168), 3);
+    stroke_rrect(c, r.x, r.y, r.w, r.h, 16, ARGB(pal.dark ? 45 : 60, 255, 255, 255));
+}
+
+static void sun_or_moon(struct canvas *c, double cx, double cy, int hour)
+{
+    if (hour >= 6 && hour < 20) {
+        for (int i = 0; i < 8; i++) {
+            double a = i * F_PI / 4;
+            draw_line(c, cx + f_cos(a) * 15, cy + f_sin(a) * 15, cx + f_cos(a) * 21, cy + f_sin(a) * 21, 2.4, 0xFFFFD34D);
+        }
+        fill_circle(c, cx, cy, 11, 0xFFFFC93C);
+        fill_circle(c, cx - 3, cy - 3, 6, ARGB(90, 255, 255, 220));
+    } else {
+        fill_circle(c, cx, cy, 15, 0xFFF4F1DE);
+        fill_circle(c, cx + 7, cy - 6, 13, pal.dark ? ARGB(255, 0x24, 0x2C, 0x5E) : ARGB(255, 0x3A, 0x5A, 0xC0));
+    }
 }
 
 static void draw_clock(struct canvas *c, struct rect r)
 {
     card(c, r);
     struct rtc_time t;
-    int64_t now = time_now();
-    time_split(now, &t);
-    char tm[8], date[64], up[64];
+    time_split(time_now(), &t);
+    sun_or_moon(c, r.x + 40, r.y + 44, t.hour);
+    char wd[32], tm[8], date[48], up[64];
+    str_copy(wd, weekday_names[day_of_week(t.year, t.month, t.day)], sizeof wd);
+    /* capitalise the first Cyrillic letter: а..п -> А..П, р..я -> Р..Я */
+    if ((uint8_t)wd[0] == 0xD0 && (uint8_t)wd[1] >= 0xB0 && (uint8_t)wd[1] <= 0xBF) {
+        wd[1] -= 0x20;
+    } else if ((uint8_t)wd[0] == 0xD1 && (uint8_t)wd[1] >= 0x80 && (uint8_t)wd[1] <= 0x8F) {
+        wd[0] = (char)0xD0;
+        wd[1] += 0x20;
+    }
+    draw_text(c, FONT_UI13, r.x + 80, r.y + 14, wd, TXT);
     snprintf(tm, sizeof tm, "%d:%02d", t.hour, t.min);
-    draw_text(c, FONT_W40, r.x + 18, r.y + 12, tm, OPAQUE(pal.text));
-    snprintf(date, sizeof date, "%s, %d %s", weekday_names[day_of_week(t.year, t.month, t.day)], t.day,
-             month_names_gen[t.month - 1]);
-    draw_text_fit(c, FONT_UI13, r.x + 20, r.y + 70, r.w - 140, date, OPAQUE(pal.text));
+    draw_text(c, FONT_W40, r.x + 78, r.y + 28, tm, TXT);
+    snprintf(date, sizeof date, "%d %s %d", t.day, month_names_gen[t.month - 1], t.year);
+    draw_text_fit(c, FONT_UI12, r.x + 80, r.y + 78, r.w - 92, date, TXT2);
     uint64_t s = timer_ms() / 1000;
     if (s < 3600)
-        snprintf(up, sizeof up, "Работает %lu мин", s / 60);
+        snprintf(up, sizeof up, "Компьютер работает %lu мин", s / 60);
     else
-        snprintf(up, sizeof up, "Работает %lu ч %lu мин", s / 3600, s / 60 % 60);
-    draw_text_fit(c, FONT_UI12, r.x + 20, r.y + 92, r.w - 140, up, OPAQUE(pal.text2));
-
-    /* analog clock */
-    double R = 46, cx = r.x + r.w - 20 - R, cy = r.y + r.h / 2.0;
-    fill_circle(c, cx, cy, R, pal.dark ? ARGB(255, 0x24, 0x25, 0x30) : 0xFFFFFFFF);
-    stroke_circle(c, cx, cy, R, 1, pal.dark ? ARGB(60, 255, 255, 255) : ARGB(30, 0, 0, 0));
-    for (int i = 0; i < 12; i++) {
-        double a = i * F_PI / 6, k = i % 3 ? 0.86 : 0.80;
-        draw_line(c, cx + f_sin(a) * R * k, cy - f_cos(a) * R * k, cx + f_sin(a) * R * 0.92, cy - f_cos(a) * R * 0.92,
-                  i % 3 ? 1.0 : 1.8, OPAQUE(i % 3 ? pal.text3 : pal.text));
-    }
-    double sec = t.sec, mn = t.min + sec / 60, hr = (t.hour % 12) + mn / 60;
-    double ah = hr * F_PI / 6, am = mn * F_PI / 30, as = sec * F_PI / 30;
-    draw_line(c, cx, cy, cx + f_sin(ah) * R * 0.5, cy - f_cos(ah) * R * 0.5, 3.2, OPAQUE(pal.text));
-    draw_line(c, cx, cy, cx + f_sin(am) * R * 0.74, cy - f_cos(am) * R * 0.74, 2.2, OPAQUE(pal.text));
-    draw_line(c, cx - f_sin(as) * R * 0.15, cy + f_cos(as) * R * 0.15, cx + f_sin(as) * R * 0.82,
-              cy - f_cos(as) * R * 0.82, 1.1, OPAQUE(pal.accent));
-    fill_circle(c, cx, cy, 3, OPAQUE(pal.accent));
+        snprintf(up, sizeof up, "Компьютер работает %lu ч %lu мин", s / 3600, s / 60 % 60);
+    draw_text_fit(c, FONT_UI11, r.x + 80, r.y + 96, r.w - 92, up, TXT2);
 }
 
 static void draw_calendar(struct canvas *c, struct rect r)
 {
     card(c, r);
+    static const char *const wd[] = { "Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб" };
+    static const char *const mon[] = { "янв.", "февр.", "марта", "апр.", "мая", "июня", "июля", "авг.", "сент.",
+                                       "окт.", "нояб.", "дек." };
     struct rtc_time t;
-    time_split(time_now(), &t);
+    int64_t now = time_now();
+    time_split(now, &t);
     char head[48];
-    snprintf(head, sizeof head, "%s %d", month_names[t.month - 1], t.year);
-    draw_text(c, FONT_UI13B, r.x + 18, r.y + 14, head, OPAQUE(pal.text));
-    static const char *const wd[] = { "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс" };
-    int cw = (r.w - 28) / 7, x0 = r.x + 14, y0 = r.y + 40;
-    for (int i = 0; i < 7; i++)
-        draw_text_center(c, FONT_UI11, x0 + i * cw + cw / 2, y0, wd[i], OPAQUE(i >= 5 ? 0xE5484D : pal.text2));
-    int first = (day_of_week(t.year, t.month, 1) + 6) % 7;      /* Monday = 0 */
-    int days = days_in_month(t.year, t.month);
-    int rh = 23;
-    for (int d = 1; d <= days; d++) {
-        int cell = first + d - 1;
-        int cx = x0 + (cell % 7) * cw + cw / 2, cy = y0 + 20 + (cell / 7) * rh + rh / 2;
-        char num[4];
-        snprintf(num, sizeof num, "%d", d);
-        bool today = d == t.day;
-        if (today)
-            fill_circle(c, cx, cy, 11, OPAQUE(pal.accent));
-        uint32_t col = today ? 0xFFFFFFFF : OPAQUE(cell % 7 >= 5 ? 0xE5484D : pal.text);
-        draw_text_center(c, FONT_UI12, cx, cy - font_height(FONT_UI12) / 2, num, col);
-        struct event ev;
-        if (!today && events_on(t.year, t.month, d, &ev, 1))
-            fill_circle(c, cx, cy + 8.5, 1.6, OPAQUE(pal.accent));
+    snprintf(head, sizeof head, "%s, %d %s", wd[day_of_week(t.year, t.month, t.day)], t.day, mon[t.month - 1]);
+    draw_text(c, FONT_UI13B, r.x + 16, r.y + 14, head, TXT);
+    ui_chevron(c, r.x + r.w - 20, r.y + 14 + font_height(FONT_UI13B) / 2.0, 7, false, TXT2);
+    /* the next events, today first */
+    int y = r.y + 44, shown = 0;
+    for (int day = 0; day < 120 && shown < 3; day++) {
+        struct rtc_time d;
+        time_split(now + (int64_t)day * 86400, &d);
+        struct event ev[3];
+        int n = events_on(d.year, d.month, d.day, ev, 3);
+        for (int i = 0; i < n && shown < 3; i++, shown++) {
+            char left[24], sub[48];
+            if (day == 0)
+                snprintf(left, sizeof left, ev[i].hour >= 0 ? "%02d:%02d" : "весь день", ev[i].hour, ev[i].min);
+            else
+                snprintf(left, sizeof left, "%d %s", d.day, mon[d.month - 1]);
+            if (day == 0)
+                snprintf(sub, sizeof sub, "Сегодня");
+            else if (day == 1)
+                snprintf(sub, sizeof sub, "Завтра%s", ev[i].hour >= 0 ? "" : ", весь день");
+            else
+                snprintf(sub, sizeof sub, "%s, через %d дн.", wd[day_of_week(d.year, d.month, d.day)], day);
+            if (day == 1 && ev[i].hour >= 0) {
+                int l = strlen(sub);
+                snprintf(sub + l, sizeof sub - l, ", %02d:%02d", ev[i].hour, ev[i].min);
+            }
+            fill_rrect(c, r.x + 16, y + 2, 3, 32, 1, ARGB(200, 150, 180, 255));
+            draw_text_fit(c, FONT_UI12, r.x + 28, y + 1, 70, left, TXT);
+            draw_text_fit(c, FONT_UI13, r.x + 100, y, r.w - 114, ev[i].text, TXT);
+            draw_text_fit(c, FONT_UI11, r.x + 100, y + 18, r.w - 114, sub, TXT2);
+            y += 44;
+        }
     }
-    struct event next;
-    int left;
-    char line[160];
-    if (event_next(t.year, t.month, t.day, &next, &left)) {
-        if (left == 0)
-            snprintf(line, sizeof line, "Сегодня: %s", next.text);
-        else if (left == 1)
-            snprintf(line, sizeof line, "Завтра: %s", next.text);
-        else
-            snprintf(line, sizeof line, "%d %s: %s", next.day, month_names_gen[next.month - 1], next.text);
-    } else {
-        snprintf(line, sizeof line, "Событий нет");
-    }
-    fill_circle(c, r.x + 22, r.y + r.h - 20, 3, OPAQUE(pal.accent));
-    draw_text_fit(c, FONT_UI12, r.x + 32, r.y + r.h - 20 - font_height(FONT_UI12) / 2, r.w - 48, line, OPAQUE(pal.text));
+    if (!shown)
+        draw_text(c, FONT_UI13, r.x + 16, y + 6, "Ближайших событий нет", TXT2);
 }
 
 static void glyph_prev_next(struct canvas *c, double cx, double cy, bool next, uint32_t col)
 {
     double d = next ? 1 : -1;
     for (int k = 0; k < 2; k++) {
-        double ox = cx + d * (k * 7 - 5);
-        double x0 = ox - d * 3.5, x1 = ox + d * 3.5;
-        for (int i = 0; i <= 6; i++) {
-            double yy = cy - 6 + i * 2;
-            double w = 1 - f_abs(yy - cy) / 6.5;
-            draw_line(c, x0, yy, x0 + (x1 - x0) * w, yy, 1.7, col);
+        double ox = cx + d * (k * 8 - 4);
+        for (double yy = -6.5; yy <= 6.5; yy += 0.5) {
+            double w = (1 - f_abs(yy) / 7) * 8;
+            draw_line(c, ox - d * 4, cy + yy, ox - d * 4 + d * w, cy + yy, 0.8, col);
         }
     }
-    draw_line(c, cx + d * 9.5, cy - 6, cx + d * 9.5, cy + 6, 1.8, col);
 }
 
 static void glyph_play(struct canvas *c, double cx, double cy, double r, bool playing, uint32_t col)
 {
     if (playing) {
-        fill_rrect(c, (int)(cx - r * 0.55), (int)(cy - r * 0.7), (int)(r * 0.38 + 1), (int)(r * 1.4), 1, col);
-        fill_rrect(c, (int)(cx + r * 0.17), (int)(cy - r * 0.7), (int)(r * 0.38 + 1), (int)(r * 1.4), 1, col);
+        fill_rrect(c, (int)(cx - r * 0.6), (int)(cy - r * 0.75), (int)(r * 0.42 + 1), (int)(r * 1.5), 1, col);
+        fill_rrect(c, (int)(cx + r * 0.18), (int)(cy - r * 0.75), (int)(r * 0.42 + 1), (int)(r * 1.5), 1, col);
         return;
     }
-    for (double y = -r * 0.75; y <= r * 0.75; y += 0.5) {
-        double w = (1 - f_abs(y) / (r * 0.75)) * r * 1.3;
-        draw_line(c, cx - r * 0.45, cy + y, cx - r * 0.45 + w, cy + y, 0.8, col);
+    for (double y = -r * 0.85; y <= r * 0.85; y += 0.5) {
+        double w = (1 - f_abs(y) / (r * 0.85)) * r * 1.5;
+        draw_line(c, cx - r * 0.55, cy + y, cx - r * 0.55 + w, cy + y, 0.8, col);
     }
 }
 
-static void fmt_time(int ms, char *buf, size_t n)
+/* Cover art for a melody: soft colour blobs picked from its name. */
+static void cover_art(struct canvas *c, int x, int y, int s, const char *name)
 {
-    int s = ms / 1000;
-    snprintf(buf, n, "%d:%02d", s / 60, s % 60);
+    uint32_t h = 2166136261u;
+    for (const char *p = name; *p; p++)
+        h = (h ^ (uint8_t)*p) * 16777619u;
+    static const uint32_t pal_a[] = { 0xFFFF7A90, 0xFF7A8CFF, 0xFFFFA25C, 0xFF46C8B4, 0xFFB57CFF, 0xFF4AA8FF };
+    uint32_t a = pal_a[h % 6], b = pal_a[(h / 7 + 2) % 6];
+    fill_rrect_grad(c, x, y, s, s, 10, a, b);
+    struct canvas cl = *c;
+    cv_clip_pt(&cl, x, y, s, s);
+    fill_circle(&cl, x + s * (0.2 + (h >> 8 & 7) / 14.0), y + s * 0.3, s * 0.42, with_alpha(b, 150));
+    fill_circle(&cl, x + s * 0.8, y + s * (0.6 + (h >> 12 & 3) / 12.0), s * 0.36, ARGB(110, 255, 255, 255));
+    /* a note on top */
+    double k = s / 64.0, nx = x + 26 * k, ny = y + 18 * k;
+    fill_rect(&cl, (int)(nx + 10 * k), (int)ny, (int)(3 * k + 1), (int)(24 * k), 0xFFFFFFFF);
+    fill_circle(&cl, nx + 6 * k, ny + 24 * k, 6 * k, 0xFFFFFFFF);
+    draw_line(&cl, nx + 11 * k, ny + 1 * k, nx + 20 * k, ny + 6 * k, 3 * k, 0xFFFFFFFF);
 }
 
 static void draw_player(struct canvas *c, struct rect r)
 {
     card(c, r);
     const struct player_state *p = player_get();
-    fill_rrect_grad(c, r.x + 16, r.y + 16, 64, 64, 12, 0xFFFF6A88, 0xFFD61F5A);
-    {
-        /* a double note, drawn */
-        double ax = r.x + 16, ay = r.y + 16, k = 64 / 512.0;
-        fill_rect(c, (int)(ax + 190 * k), (int)(ay + 150 * k), 2, (int)(188 * k), 0xFFFFFFFF);
-        fill_rect(c, (int)(ax + 318 * k), (int)(ay + 128 * k), 2, (int)(188 * k), 0xFFFFFFFF);
-        draw_line(c, ax + 191 * k, ay + 160 * k, ax + 319 * k, ay + 132 * k, 4, 0xFFFFFFFF);
-        fill_circle(c, ax + 172 * k, ay + 336 * k, 6.5, 0xFFFFFFFF);
-        fill_circle(c, ax + 300 * k, ay + 314 * k, 6.5, 0xFFFFFFFF);
-    }
     const char *title = p->loaded ? p->title : "Плеер";
     const char *sub = p->loaded ? p->subtitle : "Мелодии из папки «Музыка»";
-    draw_text_fit(c, FONT_UI13B, r.x + 94, r.y + 18, r.w - 110, title, OPAQUE(pal.text));
-    draw_text_fit(c, FONT_UI12, r.x + 94, r.y + 37, r.w - 110, sub, OPAQUE(pal.text2));
-    int by = r.y + 70;
-    pbtn[0] = (struct rect){ r.x + 92, by - 15, 34, 30 };
-    pbtn[1] = (struct rect){ r.x + 132, by - 17, 38, 34 };
-    pbtn[2] = (struct rect){ r.x + 176, by - 15, 34, 30 };
+    cover_art(c, r.x + 16, r.y + 16, 56, p->loaded ? p->title : "Плеер");
+    draw_icon(c, ICON_PLAYER, r.x + r.w - 32, r.y + 12, 18, 255);
+    draw_text_fit(c, FONT_UI13B, r.x + 84, r.y + 24, r.w - 124, title, TXT);
+    draw_text_fit(c, FONT_UI12, r.x + 84, r.y + 43, r.w - 100, sub, TXT2);
+    int cy = r.y + 96, cx = r.x + r.w / 2;
+    pbtn[0] = (struct rect){ cx - 62, cy - 16, 36, 32 };
+    pbtn[1] = (struct rect){ cx - 18, cy - 18, 36, 36 };
+    pbtn[2] = (struct rect){ cx + 26, cy - 16, 36, 32 };
     for (int i = 0; i < 3; i++)
         if (player_hot == i)
-            fill_rrect(c, pbtn[i].x, pbtn[i].y, pbtn[i].w, pbtn[i].h, 8, pal.hover);
-    uint32_t gc = OPAQUE(pal.text);
-    glyph_prev_next(c, pbtn[0].x + 17, by, false, gc);
-    fill_circle(c, pbtn[1].x + 19, by, 15, OPAQUE(pal.text));
-    glyph_play(c, pbtn[1].x + 19 + (p->playing ? 0 : 2), by, 8, p->playing, pal.dark ? 0xFF1E1E22 : 0xFFFFFFFF);
-    glyph_prev_next(c, pbtn[2].x + 17, by, true, gc);
-    /* progress */
-    int px = r.x + 16, pw = r.w - 32, py = r.y + r.h - 24;
-    fill_rrect(c, px, py, pw, 4, 2, pal.dark ? ARGB(60, 255, 255, 255) : ARGB(40, 0, 0, 0));
-    if (p->len_ms > 0) {
-        int fw = (int)((int64_t)pw * p->pos_ms / p->len_ms);
+            fill_rrect(c, pbtn[i].x, pbtn[i].y, pbtn[i].w, pbtn[i].h, 10, ARGB(45, 255, 255, 255));
+    glyph_prev_next(c, cx - 44, cy, false, TXT);
+    glyph_play(c, cx + (p->playing ? 0 : 1), cy, 10, p->playing, TXT);
+    glyph_prev_next(c, cx + 44, cy, true, TXT);
+    if (p->len_ms > 0 && (p->playing || p->pos_ms)) {
+        int pw = r.w - 32, fw = (int)((int64_t)pw * p->pos_ms / p->len_ms);
+        fill_rrect(c, r.x + 16, r.y + r.h - 8, pw, 2, 1, ARGB(60, 255, 255, 255));
         if (fw > 0)
-            fill_rrect(c, px, py, MAX(fw, 4), 4, 2, OPAQUE(pal.accent));
+            fill_rrect(c, r.x + 16, r.y + r.h - 8, MAX(fw, 2), 2, 1, TXT);
     }
-    char a[16], b[16];
-    fmt_time(p->pos_ms, a, sizeof a);
-    fmt_time(p->len_ms, b, sizeof b);
-    draw_text(c, FONT_UI11, px, py + 6, a, OPAQUE(pal.text2));
-    draw_text(c, FONT_UI11, px + pw - text_width(FONT_UI11, b), py + 6, b, OPAQUE(pal.text2));
 }
 
 void widgets_draw(struct canvas *c)

@@ -111,11 +111,11 @@ void gui_apply_settings(void)
         pal.selection = 0xDCDCE0;
         pal.menubar_tint = ARGB(110, 255, 255, 255);
         pal.menubar_text = 0x000000;
-        pal.dock_tint = ARGB(85, 255, 255, 255);
-        pal.dock_line = ARGB(90, 255, 255, 255);
+        pal.dock_tint = ARGB(105, 246, 248, 255);
+        pal.dock_line = ARGB(150, 255, 255, 255);
         pal.menu_tint = ARGB(190, 246, 246, 248);
         pal.menu_text = 0x1D1D1F;
-        pal.taskbar_tint = ARGB(150, 236, 239, 250);
+        pal.taskbar_tint = ARGB(95, 232, 238, 255);
         pal.glass_tint = ARGB(135, 246, 247, 255);
         pal.glass_line = ARGB(110, 255, 255, 255);
         pal.hover = ARGB(40, 0, 0, 0);
@@ -138,7 +138,7 @@ void gui_apply_settings(void)
         pal.dock_line = ARGB(60, 255, 255, 255);
         pal.menu_tint = ARGB(200, 38, 38, 42);
         pal.menu_text = 0xF2F2F7;
-        pal.taskbar_tint = ARGB(165, 26, 27, 36);
+        pal.taskbar_tint = ARGB(140, 22, 24, 40);
         pal.glass_tint = ARGB(150, 30, 31, 42);
         pal.glass_line = ARGB(45, 255, 255, 255);
         pal.hover = ARGB(45, 255, 255, 255);
@@ -396,6 +396,27 @@ void win_zoom(struct window *w)
 
 /* ---- rendering a window's surface ---- */
 
+void mica_fill(struct canvas *c, struct window *w, int x, int y, int ww, int hh, uint32_t tint)
+{
+    struct rect r = rect_intersect(c->clip, (struct rect){ x * S, y * S, ww * S, hh * S });
+    if (rect_empty(r))
+        return;
+    uint32_t a = tint >> 24, rgb = tint & 0xFFFFFF;
+    a += a >> 7;
+    if (!wall_blur_px) {
+        fill_rect(c, x, y, ww, hh, OPAQUE(rgb));
+        return;
+    }
+    int ox = w->x * S, oy = w->y * S, maxx = SW * S - 1, maxy = SH * S - 1;
+    for (int py = r.y; py < r.y + r.h; py++) {
+        int sy = MIN(MAX(oy + py, 0), maxy);
+        const uint32_t *src = wall_blur_px + (size_t)sy * scr.width;
+        uint32_t *dst = c->px + (size_t)py * c->stride;
+        for (int px = r.x; px < r.x + r.w; px++)
+            dst[px] = blend_px(src[MIN(MAX(ox + px, 0), maxx)], rgb, a);
+    }
+}
+
 static void draw_traffic_lights(struct canvas *c, struct window *w)
 {
     static const uint32_t fill[3] = { 0xFF5F57, 0xFEBC2E, 0x28C840 };
@@ -443,7 +464,10 @@ static void render_window(struct window *w)
     cv_init(&c, w->surf, sw, sh, w->surf_cap_w, S);
     fill_rect(&c, 0, 0, w->w, w->h, OPAQUE(pal.win_bg));
     if (!(w->flags & WF_CUSTOM_TITLE) && w->title_h) {
-        fill_rect(&c, 0, 0, w->w, w->title_h, OPAQUE(pal.title_bg));
+        if (w->flags & WF_MICA)
+            mica_fill(&c, w, 0, 0, w->w, w->title_h, pal.dark ? ARGB(205, 30, 32, 44) : ARGB(178, 236, 240, 252));
+        else
+            fill_rect(&c, 0, 0, w->w, w->title_h, OPAQUE(pal.title_bg));
         fill_rrect_px(&c, 0, w->title_h * S - 1, sw, 1, 0, OPAQUE(pal.title_line));
     }
     if (w->draw)
@@ -482,20 +506,30 @@ struct dock_geo {
     struct rect bg;                   /* points */
 };
 
+/* The frosted band along the bottom (Start and search); the Dock floats
+ * over its top edge. */
+#define DOCK_PAD    7
+#define DOCK_BOTTOM 16
+
 int taskbar_height(void)
 {
-    return settings.dock_size + 18;
+    return 52;
+}
+
+static int dock_top(void)
+{
+    return SH - DOCK_BOTTOM - settings.dock_size - 2 * DOCK_PAD;
 }
 
 struct rect desktop_area(void)
 {
-    return (struct rect){ 0, MB_H, SW, SH - MB_H - taskbar_height() };
+    return (struct rect){ 0, MB_H, SW, dock_top() - 6 - MB_H };
 }
 
-/* Icon size: smaller than asked on narrow screens, so Start and the tray fit. */
+/* Icon size: smaller than asked on narrow screens, so Start and search fit. */
 static double dock_base(void)
 {
-    double B = settings.dock_size, avail = SW - 2 * 150;
+    double B = settings.dock_size, avail = SW - 2 * 130;
     int icons = DOCK_N - 1;
     if (icons * (B + 4) + 24 > avail)
         B = f_max(24, (avail - 24) / icons - 4);
@@ -504,7 +538,7 @@ static double dock_base(void)
 
 static void dock_layout(struct dock_geo *g)
 {
-    double B = dock_base(), M = settings.dock_magnify ? 1.75 : 1.0, gap = 4, pad = 5, sepw = 14;
+    double B = dock_base(), M = settings.dock_magnify ? 1.75 : 1.0, gap = 6, pad = DOCK_PAD, sepw = 14;
     double base[DOCK_N], total = 0;
     for (int i = 0; i < DOCK_N; i++)
         total += dock_items[i] == DOCK_SEP ? sepw : B + (i ? gap : 0);
@@ -536,7 +570,7 @@ static void dock_layout(struct dock_geo *g)
     }
     int bw = (int)(sum + 2 * pad + 0.5);
     int bh = (int)(B + 2 * pad);
-    g->bg = (struct rect){ (SW - bw) / 2, SH - (taskbar_height() + bh) / 2, bw, bh };
+    g->bg = (struct rect){ (SW - bw) / 2, SH - DOCK_BOTTOM - bh, bw, bh };
 }
 
 static struct rect dock_band(void)
@@ -584,7 +618,7 @@ static struct rect dock_icon_rect(const struct app_def *app)
     dock_layout(&g);
     for (int i = 0; i < DOCK_N; i++)
         if (dock_items[i] >= 0 && all_apps[dock_items[i]] == app)
-            return (struct rect){ (int)g.x[i], g.bg.y + 5, (int)g.size[i], (int)g.size[i] };
+            return (struct rect){ (int)g.x[i], g.bg.y + DOCK_PAD, (int)g.size[i], (int)g.size[i] };
     return (struct rect){ SW / 2 - 20, SH - 50, 40, 40 };
 }
 
@@ -604,11 +638,11 @@ static const char *dock_label(int item)
 
 /* ---- the taskbar under the Dock: Start, search and the tray ---- */
 
-enum { TB_NONE, TB_START, TB_SEARCH, TB_LAYOUT, TB_CLOCK };
+enum { TB_NONE, TB_START, TB_SEARCH };
 static int tb_hover;
 
 struct tb_geo {
-    struct rect bar, start, search, layout, clock;
+    struct rect bar, start, search;
     bool compact;                     /* search is just a button */
 };
 
@@ -617,20 +651,14 @@ static void taskbar_layout(struct tb_geo *t)
     int h = taskbar_height();
     int cy = SH - h / 2;
     t->bar = (struct rect){ 0, SH - h, SW, h };
-    t->start = (struct rect){ 8, cy - 20, 40, 40 };
-    double B = dock_base(), total = 10 + 14;
+    t->start = (struct rect){ 12, cy - 19, 38, 38 };
+    double B = dock_base(), total = 2 * DOCK_PAD + 14;
     for (int i = 0; i < DOCK_N; i++)
-        total += dock_items[i] == DOCK_SEP ? 14 : B + (i ? 4 : 0);
-    int room = (int)((SW - total) / 2) - 56 - 12;
-    t->compact = room < 150;
-    int sw = t->compact ? 40 : MIN(230, room);
-    t->search = (struct rect){ 54, cy - (t->compact ? 20 : 18), sw, t->compact ? 40 : 36 };
-    char date[16];
-    snprintf(date, sizeof date, "00.00.0000");
-    int cw = text_width(FONT_UI12, date) + 16;
-    t->clock = (struct rect){ SW - 8 - cw, cy - 20, cw, 40 };
-    int lw = text_width(FONT_UI12, "РУС") + 16;
-    t->layout = (struct rect){ t->clock.x - 4 - lw, cy - 20, lw, 40 };
+        total += dock_items[i] == DOCK_SEP ? 14 : B + (i ? 6 : 0);
+    int room = (int)((SW - total) / 2) - 60 - 16;
+    t->compact = room < 140;
+    int sw = t->compact ? 38 : MIN(210, room);
+    t->search = (struct rect){ 58, cy - (t->compact ? 19 : 17), sw, t->compact ? 38 : 34 };
 }
 
 static int taskbar_item_at(int x, int y)
@@ -641,10 +669,6 @@ static int taskbar_item_at(int x, int y)
         return TB_START;
     if (rect_has(t.search, x, y))
         return TB_SEARCH;
-    if (rect_has(t.layout, x, y))
-        return TB_LAYOUT;
-    if (rect_has(t.clock, x, y))
-        return TB_CLOCK;
     return TB_NONE;
 }
 
@@ -659,42 +683,27 @@ static void draw_taskbar(struct canvas *c)
     struct tb_geo t;
     taskbar_layout(&t);
     vibrancy(c, 0, t.bar.y, SW, t.bar.h, 0, pal.taskbar_tint, 3);
-    fill_rrect_px(c, 0, t.bar.y * S, SW * S, 1, 0, pal.dark ? ARGB(50, 255, 255, 255) : ARGB(140, 255, 255, 255));
-    uint32_t tc = OPAQUE(pal.text);
+    fill_rrect_px(c, 0, t.bar.y * S, SW * S, 1, 0, pal.dark ? ARGB(40, 255, 255, 255) : ARGB(90, 255, 255, 255));
     /* Start */
     if (start_active() || tb_hover == TB_START)
-        fill_rrect(c, t.start.x, t.start.y, t.start.w, t.start.h, 8, start_active() ? (pal.dark ? ARGB(70, 255, 255, 255) : ARGB(150, 255, 255, 255)) : pal.hover);
-    draw_icon(c, ICON_BRO, t.start.x + 6, t.start.y + 6, 28, 255);
+        fill_rrect(c, t.start.x, t.start.y, t.start.w, t.start.h, 8, pal.dark ? ARGB(start_active() ? 60 : 40, 255, 255, 255)
+                                                                                : ARGB(start_active() ? 150 : 100, 255, 255, 255));
+    draw_icon(c, ICON_BRO, t.start.x + 5, t.start.y + 5, 28, 255);
     /* search */
     struct rect r = t.search;
+    uint32_t gc = pal.dark ? 0xFFD8DCF0 : 0xFF4A5068;
     if (t.compact) {
         if (tb_hover == TB_SEARCH)
-            fill_rrect(c, r.x, r.y, r.w, r.h, 8, pal.hover);
-        draw_search_glyph(c, r.x + 17, r.y + 17, 5.5, tc);
+            fill_rrect(c, r.x, r.y, r.w, r.h, 8, pal.dark ? ARGB(40, 255, 255, 255) : ARGB(100, 255, 255, 255));
+        draw_search_glyph(c, r.x + 17, r.y + 17, 5.5, gc);
     } else {
-        uint32_t fill = pal.dark ? ARGB(tb_hover == TB_SEARCH ? 70 : 45, 255, 255, 255)
-                                 : ARGB(tb_hover == TB_SEARCH ? 235 : 200, 255, 255, 255);
+        uint32_t fill = pal.dark ? ARGB(tb_hover == TB_SEARCH ? 60 : 38, 255, 255, 255)
+                                 : ARGB(tb_hover == TB_SEARCH ? 200 : 150, 255, 255, 255);
         fill_rrect(c, r.x, r.y, r.w, r.h, r.h / 2, fill);
-        stroke_rrect(c, r.x, r.y, r.w, r.h, r.h / 2, pal.dark ? ARGB(40, 255, 255, 255) : ARGB(28, 0, 0, 0));
-        draw_search_glyph(c, r.x + 19, r.y + r.h / 2.0 - 1.5, 5.2, OPAQUE(pal.text2));
-        draw_text(c, FONT_UI13, r.x + 36, r.y + (r.h - font_height(FONT_UI13)) / 2, "Поиск", OPAQUE(pal.text2));
+        stroke_rrect(c, r.x, r.y, r.w, r.h, r.h / 2, pal.dark ? ARGB(40, 255, 255, 255) : ARGB(110, 255, 255, 255));
+        draw_search_glyph(c, r.x + 19, r.y + r.h / 2.0 - 1.5, 5.2, gc);
+        draw_text(c, FONT_UI13, r.x + 36, r.y + (r.h - font_height(FONT_UI13)) / 2, "Поиск", gc);
     }
-    /* tray: keyboard layout, clock */
-    if (tb_hover == TB_LAYOUT)
-        fill_rrect(c, t.layout.x, t.layout.y, t.layout.w, t.layout.h, 8, pal.hover);
-    draw_text_center(c, FONT_UI12, t.layout.x + t.layout.w / 2, t.layout.y + (40 - font_height(FONT_UI12)) / 2,
-                     kbd_layout_ru() ? "РУС" : "ENG", tc);
-    if (tb_hover == TB_CLOCK)
-        fill_rrect(c, t.clock.x, t.clock.y, t.clock.w, t.clock.h, 8, pal.hover);
-    struct rtc_time now;
-    time_split(time_now(), &now);
-    char tm[16], date[16];
-    snprintf(tm, sizeof tm, "%d:%02d", now.hour, now.min);
-    snprintf(date, sizeof date, "%02d.%02d.%04d", now.day, now.month, now.year);
-    int lh = font_height(FONT_UI12);
-    int cx = t.clock.x + t.clock.w - 8;
-    draw_text(c, FONT_UI12, cx - text_width(FONT_UI12, tm), t.clock.y + 20 - lh, tm, tc);
-    draw_text(c, FONT_UI12, cx - text_width(FONT_UI12, date), t.clock.y + 20, date, tc);
 }
 
 static void draw_dock(struct canvas *c)
@@ -703,9 +712,10 @@ static void draw_dock(struct canvas *c)
     dock_layout(&g);
     uint64_t now = timer_ms();
     draw_taskbar(c);
-    fill_rrect(c, g.bg.x, g.bg.y, g.bg.w, g.bg.h, 14, pal.dark ? ARGB(30, 255, 255, 255) : ARGB(80, 255, 255, 255));
-    stroke_rrect(c, g.bg.x, g.bg.y, g.bg.w, g.bg.h, 14, pal.dock_line);
-    double base_y = g.bg.y + g.bg.h - 5;
+    draw_shadow(c, g.bg.x, g.bg.y + 6, g.bg.w, g.bg.h, 20, 18, pal.dark ? 90 : 45);
+    vibrancy(c, g.bg.x, g.bg.y, g.bg.w, g.bg.h, 20, pal.dock_tint, 3);
+    stroke_rrect(c, g.bg.x, g.bg.y, g.bg.w, g.bg.h, 20, pal.dock_line);
+    double base_y = g.bg.y + g.bg.h - DOCK_PAD;
     for (int i = 0; i < DOCK_N; i++) {
         if (dock_items[i] == DOCK_SEP) {
             double x = g.x[i] + g.size[i] / 2;
@@ -717,7 +727,7 @@ static void draw_dock(struct canvas *c)
         draw_icon(c, dock_icon_of(i), g.x[i], y, sz, 255);
         int a = dock_items[i];
         if (a >= 0 && app_running(all_apps[a]))
-            fill_circle(c, g.x[i] + sz / 2, g.bg.y + g.bg.h - 2.5, 2, pal.dark ? ARGB(220, 255, 255, 255) : ARGB(190, 0, 0, 0));
+            fill_circle(c, g.x[i] + sz / 2, g.bg.y + g.bg.h - 3, 2, pal.dark ? ARGB(220, 255, 255, 255) : ARGB(170, 20, 30, 70));
     }
     if (dock_hover_item >= 0 && dock_hover > 0.6 && drag == DRAG_NONE) {
         int i = dock_hover_item;
@@ -742,7 +752,7 @@ static int dock_item_at(int x, int y)
         return -1;
     for (int i = 0; i < DOCK_N; i++)
         if (dock_items[i] != DOCK_SEP && x >= g.x[i] && x < g.x[i] + g.size[i] + 4)
-            return y >= g.bg.y - 2 || y >= g.bg.y + g.bg.h - 5 - g.size[i] ? i : -1;
+            return y >= g.bg.y - 2 || y >= g.bg.y + g.bg.h - DOCK_PAD - g.size[i] ? i : -1;
     return -1;
 }
 
@@ -1553,8 +1563,8 @@ static void update_hover(int x, int y)
         tl_hover = nh;
     }
     /* taskbar */
-    int tb = mode == MODE_DESKTOP && !launchpad_active() && !mn.open && y >= SH - taskbar_height() ? taskbar_item_at(x, y)
-                                                                                                    : TB_NONE;
+    int tb = mode == MODE_DESKTOP && !launchpad_active() && !mn.open && y >= SH - taskbar_height() && !in_dock(x, y)
+                 ? taskbar_item_at(x, y) : TB_NONE;
     if (tb != tb_hover) {
         tb_hover = tb;
         damage_dock();
@@ -1580,6 +1590,8 @@ static void pointer_move(int x, int y)
         drag_win->x = drag_ox + x - drag_mx;
         drag_win->y = MAX(MB_H, drag_oy + y - drag_my);
         drag_win->zoomed = false;
+        if (drag_win->flags & WF_MICA)
+            drag_win->dirty = true;
         damage_win(drag_win);
         return;
     }
@@ -1738,12 +1750,6 @@ static void pointer_down(int x, int y, int button)
             start_toggle(false);
         } else if (item == TB_SEARCH && button == 1) {
             start_toggle(true);
-        } else if (item == TB_LAYOUT) {
-            kbd_set_layout_ru(!kbd_layout_ru());
-            damage_dock();
-            damage_menubar();
-        } else if (item == TB_CLOCK) {
-            app_launch("calendar", NULL);
         } else if (in_dock(x, y)) {
             int i = dock_item_at(x, y);
             if (i >= 0 && button == 1)
@@ -2090,7 +2096,7 @@ void gui_set_wallpaper(int i)
 {
     settings.wallpaper = i;
     wallpaper_render(i, SW * S, SH * S);
-    gui_damage_screen();
+    gui_redraw_all();
 }
 
 static void wait_for_event(void)

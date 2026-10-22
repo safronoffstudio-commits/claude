@@ -98,7 +98,7 @@ static void photos_draw(struct window *w, struct canvas *c)
         scan(p);
     int W = w->w, H = w->h;
     /* title bar */
-    fill_rect(c, 0, 0, W, BAR, OPAQUE(pal.title_bg));
+    mica_fill(c, w, 0, 0, W, BAR, pal.dark ? ARGB(205, 30, 32, 44) : ARGB(178, 236, 240, 252));
     fill_rrect_px(c, 0, BAR * c->s - 1, W * c->s, 1, 0, OPAQUE(pal.title_line));
     const char *name = p->cur >= 0 ? fs_base(p->list[p->cur]) : "Фото";
     draw_text_center(c, FONT_UI13B, W / 2, (BAR - font_height(FONT_UI13B)) / 2, name, OPAQUE(pal.text));
@@ -148,7 +148,7 @@ static void photos_draw(struct window *w, struct canvas *c)
     }
     /* filmstrip */
     int sy = H - STRIP;
-    fill_rect(c, 0, sy, W, STRIP, OPAQUE(pal.title_bg));
+    mica_fill(c, w, 0, sy, W, STRIP, pal.dark ? ARGB(205, 30, 32, 44) : ARGB(178, 236, 240, 252));
     fill_rrect_px(c, 0, sy * c->s, W * c->s, 1, 0, OPAQUE(pal.title_line));
     int tw = 96, th = 60, gap = 10;
     int total = p->count * (tw + gap) - gap;
@@ -267,7 +267,7 @@ static void photos_launch(const char *arg)
         p = kzalloc(sizeof *p);
         if (!p)
             return;
-        struct window *w = win_open(&app_photos, "Фото", 900, 600, WF_RESIZABLE | WF_CUSTOM_TITLE | WF_HIDE_TITLE);
+        struct window *w = win_open(&app_photos, "Фото", 900, 600, WF_RESIZABLE | WF_CUSTOM_TITLE | WF_HIDE_TITLE | WF_MICA);
         if (!w) {
             kfree(p);
             return;

@@ -71,18 +71,20 @@ bool start_animating(void)
     return open_ && settings.animations && timer_ms() - t0 < (uint64_t)(260 * anim_slowdown);
 }
 
+/* Centred above the Dock, as in Windows 11. */
 static struct rect panel(void)
 {
-    int SW = gui_screen_w(), SH = gui_screen_h();
-    int h = MIN(620, SH - 24 - taskbar_height() - 20);
-    int w = MIN(600, SW - 20);
-    return (struct rect){ 10, SH - taskbar_height() - 10 - h, w, h };
+    int SW = gui_screen_w();
+    struct rect area = desktop_area();
+    int h = MIN(540, area.h - 20);
+    int w = MIN(590, SW - 20);
+    return (struct rect){ (SW - w) / 2, area.y + area.h - 6 - h, w, h };
 }
 
 struct rect start_bounds(void)
 {
     struct rect p = panel();
-    return (struct rect){ 0, p.y - 30, p.x + p.w + 40, gui_screen_h() - (p.y - 30) };
+    return (struct rect){ p.x - 40, p.y - 30, p.w + 80, gui_screen_h() - (p.y - 30) };
 }
 
 static void collect_recent(void)
@@ -217,11 +219,12 @@ static void draw_home(struct canvas *c, struct rect p, int y)
     int x0 = p.x + 36, inner = p.w - 72;
     draw_text(c, FONT_UI13B, x0 + 8, y, "Закреплённые", tc);
     const char *all = "Все приложения";
-    int bw = text_width(FONT_UI12, all) + 34, bh = 24;
-    int bx = p.x + p.w - 36 - bw, by = y - 4;
-    fill_rrect(c, bx, by, bw, bh, 5, hot(H_ALL, 0) ? hover_fill() : (pal.dark ? ARGB(25, 255, 255, 255) : ARGB(110, 255, 255, 255)));
-    draw_text(c, FONT_UI12, bx + 10, by + (bh - font_height(FONT_UI12)) / 2, all, tc);
-    ui_chevron(c, bx + bw - 13, by + bh / 2.0, 7, false, tc);
+    int bw = text_width(FONT_UI12, all) + 30, bh = 24;
+    int bx = p.x + p.w - 30 - bw, by = y - 4;
+    if (hot(H_ALL, 0))
+        fill_rrect(c, bx, by, bw, bh, 5, hover_fill());
+    draw_text(c, FONT_UI12, bx + 8, by + (bh - font_height(FONT_UI12)) / 2, all, tc);
+    ui_chevron(c, bx + bw - 11, by + bh / 2.0, 6, false, tc);
     add_hit(bx, by, bw, bh, H_ALL, 0);
 
     int cols = 6, cw = inner / cols, ch = 80;
@@ -250,7 +253,7 @@ static void draw_home(struct canvas *c, struct rect p, int y)
     (void)now;
     for (int i = 0; i < nrecent; i++) {
         int rx = x0 + (i % 2) * rw, ry = y + (i / 2) * rh;
-        if (ry + rh > p.y + p.h - 70)
+        if (ry + rh > p.y + p.h - 62)
             break;
         if (hot(H_RECENT, i))
             fill_rrect(c, rx + 2, ry, rw - 4, rh - 4, 6, hover_fill());
@@ -382,15 +385,14 @@ void start_draw(struct canvas *c0)
     struct canvas cc = *c0, *c = &cc;
     cv_clip_pt(c, 0, 0, gui_screen_w(), SH - taskbar_height());
     nhits = 0;
-    draw_shadow(c, p.x, p.y + 10, p.w, p.h, 12, 26, (int)(95 * e));
-    vibrancy(c, p.x, p.y, p.w, p.h, 12, pal.dark ? ARGB(212, 32, 33, 42) : ARGB(200, 240, 242, 250), 4);
-    stroke_rrect(c, p.x, p.y, p.w, p.h, 12, pal.dark ? ARGB(55, 255, 255, 255) : ARGB(150, 255, 255, 255));
+    draw_shadow(c, p.x, p.y + 12, p.w, p.h, 16, 30, (int)(90 * e));
+    vibrancy(c, p.x, p.y, p.w, p.h, 16, pal.dark ? ARGB(205, 30, 32, 46) : ARGB(178, 236, 241, 254), 4);
+    stroke_rrect(c, p.x, p.y, p.w, p.h, 16, pal.dark ? ARGB(55, 255, 255, 255) : ARGB(170, 255, 255, 255));
 
     /* search field */
-    struct rect s = { p.x + 32, p.y + 26, p.w - 64, 36 };
-    fill_rrect(c, s.x, s.y, s.w, s.h, 18, pal.dark ? ARGB(255, 0x2B, 0x2C, 0x36) : 0xFFFFFFFF);
-    stroke_rrect(c, s.x, s.y, s.w, s.h, 18, pal.dark ? ARGB(50, 255, 255, 255) : ARGB(30, 0, 0, 0));
-    fill_rrect(c, s.x + 18, s.y + s.h - 2, s.w - 36, 2, 1, OPAQUE(pal.accent));
+    struct rect s = { p.x + 28, p.y + 26, p.w - 56, 36 };
+    fill_rrect(c, s.x, s.y, s.w, s.h, 18, pal.dark ? ARGB(255, 0x2B, 0x2D, 0x3C) : ARGB(235, 255, 255, 255));
+    stroke_rrect(c, s.x, s.y, s.w, s.h, 18, pal.dark ? ARGB(50, 255, 255, 255) : ARGB(255, 255, 255, 255));
     uint32_t ic = OPAQUE(pal.text2);
     stroke_circle(c, s.x + 20, s.y + 16.5, 5.4, 1.6, ic);
     draw_line(c, s.x + 24, s.y + 20.5, s.x + 28, s.y + 24.5, 1.8, ic);
@@ -412,8 +414,13 @@ void start_draw(struct canvas *c0)
     else
         draw_home(c, p, y);
 
-    /* user and power */
-    fill_rrect_px(c, p.x * c->s, by * c->s, p.w * c->s, 1, 0, pal.dark ? ARGB(40, 255, 255, 255) : ARGB(28, 0, 0, 0));
+    /* user and power, on a slightly darker strip */
+    {
+        struct canvas cb = *c;
+        cv_clip_pt(&cb, p.x, by, p.w, 64);
+        fill_rrect(&cb, p.x, by - 20, p.w, 84, 16, pal.dark ? ARGB(40, 0, 0, 0) : ARGB(70, 214, 224, 248));
+        fill_rrect_px(c, p.x * c->s, by * c->s, p.w * c->s, 1, 0, pal.dark ? ARGB(40, 255, 255, 255) : ARGB(120, 255, 255, 255));
+    }
     int uw = text_width(FONT_UI13, OS_USER) + 66;
     if (hot(H_USER, 0))
         fill_rrect(c, p.x + 40, by + 12, uw, 40, 6, hover_fill());
@@ -523,7 +530,9 @@ bool start_mouse(const struct mevent *e)
     if (!rect_has(p, e->x, e->y)) {
         start_close();
         /* a click on the taskbar (not on Start itself) still does its job */
-        return !(e->y >= gui_screen_h() - taskbar_height() && e->x > 52);
+        struct rect area = desktop_area();
+        bool on_start = e->x < 52 && e->y >= gui_screen_h() - taskbar_height();
+        return !(e->y >= area.y + area.h && !on_start);
     }
     activate(kind, idx, e->x, e->y);
     gui_damage(start_bounds());

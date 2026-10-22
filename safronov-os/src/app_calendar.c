@@ -204,7 +204,7 @@ static void cal_draw(struct window *w, struct canvas *c)
         }
     }
     /* side panel: the selected day */
-    fill_rect(c, gw, top, side, H - top, OPAQUE(pal.sidebar_bg));
+    mica_fill(c, w, gw, top, side, H - top, pal.dark ? ARGB(205, 30, 32, 44) : ARGB(178, 236, 240, 252));
     fill_rrect_px(c, gw * c->s, top * c->s, 1, (H - top) * c->s, 0, OPAQUE(pal.separator));
     int sx = gw + 20, sw = side - 40, y = top + 20;
     char day[64];
@@ -382,7 +382,7 @@ static void cal_launch(const char *arg)
     if (!k)
         return;
     today(&k->year, &k->month, &k->sel_day);
-    struct window *w = win_open(&app_calendar, "Календарь", 940, 600, WF_RESIZABLE);
+    struct window *w = win_open(&app_calendar, "Календарь", 940, 600, WF_RESIZABLE | WF_MICA);
     if (!w) {
         kfree(k);
         return;

@@ -183,7 +183,7 @@ static void player_draw(struct window *w, struct canvas *c)
     scan();
     int H = w->h, W = w->w, top = w->title_h;
     /* playlist */
-    fill_rect(c, 0, top, LIST_W, H - top, OPAQUE(pal.sidebar_bg));
+    mica_fill(c, w, 0, top, LIST_W, H - top, pal.dark ? ARGB(205, 30, 32, 44) : ARGB(178, 236, 240, 252));
     fill_rrect_px(c, LIST_W * c->s - 1, top * c->s, 1, (H - top) * c->s, 0, OPAQUE(pal.separator));
     draw_text(c, FONT_UI11, 18, top + 14, "МУЗЫКА", OPAQUE(pal.text3));
     int y = top + 34;
@@ -374,7 +374,7 @@ static void player_launch(const char *arg)
     if (!p)
         return;
     p->hover = -1;
-    struct window *w = win_open(&app_player, "Плеер", 720, 470, WF_RESIZABLE);
+    struct window *w = win_open(&app_player, "Плеер", 720, 470, WF_RESIZABLE | WF_MICA);
     if (!w) {
         kfree(p);
         return;

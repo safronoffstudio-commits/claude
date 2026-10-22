@@ -1,20 +1,37 @@
-/* Explorer: a Windows 11 style file browser with macOS window buttons.
- * Navigation pane, back/forward/up, an address bar with breadcrumbs, a
- * command bar, "This PC" with folders and the disk, icon and details views,
- * search, rename, drag and drop into folders, and the Trash. */
+/* Explorer: the file browser, drawn after the Safronov OS design: macOS
+ * window buttons on a translucent "Mica" window over the wallpaper, a side
+ * bar with places and devices, big folders, "This PC" with the disk, search,
+ * icon and table views, rename, drag and drop into folders, and the Trash. */
 #include "gui.h"
 
-#define ROW1   50                     /* title row: buttons, address, search */
-#define ROW2   44                     /* command bar */
-#define TOP    (ROW1 + ROW2)
-#define NAV_W  204
-#define STATUS 26
+#define TITLE_H 40                    /* window buttons, icon and title */
+#define BAR_H   44                    /* back/forward, path, search */
+#define TOP     (TITLE_H + BAR_H)
+#define SIDE_W  196
 #define LOC_DRIVE (-3)
 
 enum { IT_FOLDER, IT_DRIVE, IT_FILE };
 enum { ACT_NEW = 1, ACT_OPEN, ACT_RENAME, ACT_TRASH, ACT_RESTORE, ACT_DELETE, ACT_EMPTY, ACT_ICONS, ACT_LIST,
        ACT_NEWWIN, ACT_SORT_NAME, ACT_SORT_DATE, ACT_SORT_SIZE, ACT_BACK, ACT_FORWARD, ACT_UP };
-enum { B_BACK, B_FWD, B_UP, B_NEW, B_RENAME, B_DELETE, B_RESTORE, B_EMPTY, B_SORT, B_VIEW, B_COUNT };
+enum { B_BACK, B_FWD, B_NEW, B_VIEW, B_COUNT };
+
+/* the side bar */
+enum { G_PC, G_DESKTOP, G_DOCS, G_PICS, G_MUSIC, G_VIDEO, G_DOWN, G_TRASH, G_DRIVE };
+static const struct {
+    int loc, glyph;
+    const char *header;               /* a section title above the entry */
+} nav_items[] = {
+    { LOC_PC, G_PC, NULL },
+    { FOLDER_DESKTOP, G_DESKTOP, NULL },
+    { FOLDER_DOCS, G_DOCS, NULL },
+    { FOLDER_PICTURES, G_PICS, NULL },
+    { FOLDER_MUSIC, G_MUSIC, NULL },
+    { FOLDER_VIDEOS, G_VIDEO, NULL },
+    { FOLDER_DOWNLOADS, G_DOWN, NULL },
+    { LOC_TRASH, G_TRASH, "Места" },
+    { LOC_DRIVE, G_DRIVE, "Устройства" },
+};
+#define NAV_N ((int)ARRAY_SIZE(nav_items))
 
 #define MAX_ITEMS 260
 struct item {
@@ -28,7 +45,7 @@ struct explorer {
     bool list;
     int sort;                         /* 0 name, 1 date, 2 size */
     struct item items[MAX_ITEMS];
-    int count, sel, scroll, hover;
+    int count, sel, scroll, hover, nav_hover, btn_hover;
     uint32_t ver;
     struct textfield search;
     bool search_focus;
@@ -38,14 +55,10 @@ struct explorer {
     /* drag and drop */
     bool press, dragging;
     int press_x, press_y, mx, my, drop_nav;
-    struct rect btn[B_COUNT], nav[8], f_search, content;
+    struct rect btn[B_COUNT], nav[NAV_N], f_search, content;
     struct rect cells[MAX_ITEMS];
     int ncells;
 };
-
-/* navigation pane entries */
-static const int nav_loc[8] = { FOLDER_DESKTOP, FOLDER_DOWNLOADS, FOLDER_DOCS, FOLDER_PICTURES, FOLDER_MUSIC,
-                                FOLDER_VIDEOS, LOC_PC, LOC_TRASH };
 
 static const char *loc_name(int loc)
 {
@@ -58,12 +71,17 @@ static int loc_icon(int loc)
 {
     if (loc >= 0)
         return folder_icon(loc);
-    return loc == LOC_PC ? ICON_COMPUTER : loc == LOC_TRASH ? ICON_TRASH : ICON_DRIVE;
+    return loc == LOC_PC ? ICON_COMPUTER : loc == LOC_TRASH ? ICON_RECYCLE : ICON_DRIVE;
+}
+
+static bool home_view(struct explorer *e)
+{
+    return (e->loc == LOC_PC || e->loc == LOC_DRIVE) && !e->search.len;
 }
 
 static bool is_folder_view(struct explorer *e)
 {
-    return e->loc >= 0 || e->loc == LOC_TRASH || ((e->loc == LOC_PC || e->loc == LOC_DRIVE) && e->search.len);
+    return !home_view(e);
 }
 
 static int64_t item_time(const struct item *it)
@@ -87,18 +105,23 @@ static int compare(struct explorer *e, const struct item *a, const struct item *
     return strcmp(fs_base(a->path), fs_base(b->path));
 }
 
+/* The order of the folders on "This PC", as in the design. */
+static const int pc_folders[FOLDER_COUNT] = {
+    FOLDER_DESKTOP, FOLDER_DOCS, FOLDER_PICTURES, FOLDER_MUSIC, FOLDER_VIDEOS, FOLDER_DOWNLOADS,
+};
+
 static void refresh(struct explorer *e)
 {
     char keep[FS_NAME_MAX] = "";
     if (e->sel >= 0 && e->sel < e->count)
         str_copy(keep, e->items[e->sel].path, sizeof keep);
     e->count = 0;
-    if ((e->loc == LOC_PC || e->loc == LOC_DRIVE) && !e->search.len) {
+    if (home_view(e)) {
         for (int i = 0; i < FOLDER_COUNT; i++) {
             struct item *it = &e->items[e->count++];
             it->kind = IT_FOLDER;
-            it->folder = i;
-            str_copy(it->path, fs_folders[i], FS_NAME_MAX);
+            it->folder = pc_folders[i];
+            str_copy(it->path, fs_folders[pc_folders[i]], FS_NAME_MAX);
         }
         if (e->loc == LOC_PC) {
             struct item *it = &e->items[e->count++];
@@ -158,106 +181,100 @@ static void go(struct window *w, int loc, bool record)
 
 /* ---- glyphs ---- */
 
-static void g_arrow(struct canvas *c, double cx, double cy, int dir, uint32_t col)
+static void g_chevron(struct canvas *c, double cx, double cy, bool left, uint32_t col)
 {
-    /* dir: 0 left, 1 right, 2 up */
-    if (dir == 2) {
-        draw_line(c, cx, cy - 6, cx, cy + 6, 1.5, col);
-        draw_line(c, cx - 5, cy - 1, cx, cy - 6, 1.5, col);
-        draw_line(c, cx + 5, cy - 1, cx, cy - 6, 1.5, col);
-        return;
-    }
-    double d = dir ? 1 : -1;
-    draw_line(c, cx - 6 * d, cy, cx + 6 * d, cy, 1.5, col);
-    draw_line(c, cx + 1 * d, cy - 5, cx + 6 * d, cy, 1.5, col);
-    draw_line(c, cx + 1 * d, cy + 5, cx + 6 * d, cy, 1.5, col);
+    double d = left ? 1 : -1;
+    draw_line(c, cx + 2.5 * d, cy - 6, cx - 3.5 * d, cy, 1.7, col);
+    draw_line(c, cx - 3.5 * d, cy, cx + 2.5 * d, cy + 6, 1.7, col);
 }
 
-static void g_pencil(struct canvas *c, double x, double y, uint32_t col)
+static void g_plus(struct canvas *c, double x, double y, uint32_t col)
 {
-    draw_line(c, x - 5, y + 5, x + 4, y - 4, 1.4, col);
-    draw_line(c, x - 3, y + 7, x + 6, y - 2, 1.4, col);
-    draw_line(c, x + 4, y - 4, x + 6, y - 2, 1.4, col);
-    draw_line(c, x - 5, y + 5, x - 6, y + 8, 1.4, col);
-    draw_line(c, x - 6, y + 8, x - 3, y + 7, 1.4, col);
-}
-
-static void g_trash(struct canvas *c, double x, double y, uint32_t col)
-{
-    stroke_rrect(c, (int)x - 5, (int)y - 4, 10, 12, 2, col);
-    draw_line(c, x - 7, y - 6, x + 7, y - 6, 1.4, col);
-    draw_line(c, x - 2, y - 8, x + 2, y - 8, 1.4, col);
-    draw_line(c, x - 2, y - 1, x - 2, y + 5, 1.1, col);
-    draw_line(c, x + 2, y - 1, x + 2, y + 5, 1.1, col);
-}
-
-static void g_sort(struct canvas *c, double x, double y, uint32_t col)
-{
-    draw_line(c, x - 4, y - 6, x - 4, y + 6, 1.3, col);
-    draw_line(c, x - 7, y + 3, x - 4, y + 6, 1.3, col);
-    draw_line(c, x - 1, y + 3, x - 4, y + 6, 1.3, col);
-    draw_line(c, x + 4, y + 6, x + 4, y - 6, 1.3, col);
-    draw_line(c, x + 1, y - 3, x + 4, y - 6, 1.3, col);
-    draw_line(c, x + 7, y - 3, x + 4, y - 6, 1.3, col);
+    draw_line(c, x - 6, y, x + 6, y, 1.6, col);
+    draw_line(c, x, y - 6, x, y + 6, 1.6, col);
 }
 
 static void g_view(struct canvas *c, double x, double y, bool list, uint32_t col)
 {
     if (list) {
         for (int i = 0; i < 3; i++)
-            draw_line(c, x - 7, y - 5 + i * 5, x + 7, y - 5 + i * 5, 1.3, col);
+            draw_line(c, x - 7, y - 5 + i * 5, x + 7, y - 5 + i * 5, 1.4, col);
     } else {
         for (int i = 0; i < 4; i++)
             stroke_rrect(c, (int)x - 7 + (i % 2) * 8, (int)y - 7 + (i / 2) * 8, 6, 6, 1, col);
     }
 }
 
-static void g_restore(struct canvas *c, double x, double y, uint32_t col)
+/* Outline icons for the side bar (16 points). */
+static void side_glyph(struct canvas *c, int g, double x, double y, uint32_t col, uint32_t blue)
 {
-    double px = 0, py = 0;
-    for (int i = 0; i <= 12; i++) {
-        double a = (200 + i * 250 / 12.0) * F_PI / 180;
-        double qx = x + 6 * f_cos(a), qy = y + 6 * f_sin(a);
-        if (i)
-            draw_line(c, px, py, qx, qy, 1.4, col);
-        px = qx, py = qy;
+    switch (g) {
+    case G_PC:
+        fill_rrect(c, (int)x, (int)y + 1, 16, 11, 2, blue);
+        draw_line(c, x + 8, y + 12, x + 8, y + 15, 1.5, col);
+        draw_line(c, x + 4, y + 15.5, x + 12, y + 15.5, 1.5, col);
+        break;
+    case G_DESKTOP:
+        stroke_rrect(c, (int)x, (int)y + 1, 16, 11, 2, col);
+        draw_line(c, x + 4, y + 15, x + 12, y + 15, 1.4, col);
+        break;
+    case G_DOCS:
+        stroke_rrect(c, (int)x + 2, (int)y, 12, 16, 2, col);
+        draw_line(c, x + 5, y + 5, x + 11, y + 5, 1.2, col);
+        draw_line(c, x + 5, y + 8, x + 11, y + 8, 1.2, col);
+        draw_line(c, x + 5, y + 11, x + 9, y + 11, 1.2, col);
+        break;
+    case G_PICS:
+        stroke_rrect(c, (int)x, (int)y + 2, 16, 12, 2, col);
+        draw_line(c, x + 2, y + 12, x + 6, y + 7, 1.3, col);
+        draw_line(c, x + 6, y + 7, x + 9, y + 10, 1.3, col);
+        draw_line(c, x + 9, y + 10, x + 11, y + 8, 1.3, col);
+        draw_line(c, x + 11, y + 8, x + 14, y + 12, 1.3, col);
+        fill_circle(c, x + 11.5, y + 5.5, 1.4, col);
+        break;
+    case G_MUSIC:
+        draw_line(c, x + 7, y + 2, x + 7, y + 12, 1.5, col);
+        draw_line(c, x + 7, y + 2, x + 13, y + 1, 1.5, col);
+        draw_line(c, x + 13, y + 1, x + 13, y + 10, 1.5, col);
+        stroke_circle(c, x + 4.8, y + 12.5, 2.3, 1.4, col);
+        stroke_circle(c, x + 10.8, y + 10.5, 2.3, 1.4, col);
+        break;
+    case G_VIDEO:
+        stroke_rrect(c, (int)x, (int)y + 2, 16, 12, 2, col);
+        draw_line(c, x + 6, y + 5, x + 6, y + 11, 1.3, col);
+        draw_line(c, x + 6, y + 5, x + 11, y + 8, 1.3, col);
+        draw_line(c, x + 6, y + 11, x + 11, y + 8, 1.3, col);
+        break;
+    case G_DOWN:
+        draw_line(c, x + 8, y + 1, x + 8, y + 11, 1.5, col);
+        draw_line(c, x + 4, y + 7, x + 8, y + 11, 1.5, col);
+        draw_line(c, x + 12, y + 7, x + 8, y + 11, 1.5, col);
+        draw_line(c, x + 2, y + 15, x + 14, y + 15, 1.5, col);
+        break;
+    case G_TRASH:
+        stroke_rrect(c, (int)x + 3, (int)y + 4, 10, 12, 2, col);
+        draw_line(c, x + 1, y + 3, x + 15, y + 3, 1.4, col);
+        draw_line(c, x + 6, y + 1, x + 10, y + 1, 1.4, col);
+        break;
+    case G_DRIVE:
+        stroke_rrect(c, (int)x, (int)y + 4, 16, 9, 3, col);
+        fill_circle(c, x + 12.5, y + 8.5, 1.2, col);
+        break;
     }
-    double ax = x + 6 * f_cos(200 * F_PI / 180), ay = y + 6 * f_sin(200 * F_PI / 180);
-    draw_line(c, ax, ay, ax - 1, ay - 5, 1.4, col);
-    draw_line(c, ax, ay, ax + 4.5, ay - 2, 1.4, col);
-}
-
-static void g_plus(struct canvas *c, double x, double y, uint32_t col)
-{
-    draw_line(c, x - 5, y, x + 5, y, 1.6, col);
-    draw_line(c, x, y - 5, x, y + 5, 1.6, col);
 }
 
 /* ---- drawing ---- */
 
 static uint32_t hover_fill(void)
 {
-    return pal.dark ? ARGB(255, 0x38, 0x38, 0x3C) : ARGB(255, 0xEA, 0xEA, 0xEE);
+    return pal.dark ? ARGB(30, 255, 255, 255) : ARGB(110, 255, 255, 255);
 }
 
-static void cmd_button(struct canvas *c, struct rect *r, int x, int y, const char *label, int glyph, bool enabled,
-                       bool wide, struct explorer *e, int id)
+static uint32_t sel_fill(bool focused)
 {
-    (void)e;
-    int w = wide ? text_width(FONT_UI13, label) + 40 : 34;
-    *r = (struct rect){ x, y, w, 32 };
-    uint32_t col = enabled ? OPAQUE(pal.text) : OPAQUE(pal.text3);
-    double gx = x + 17, gy = y + 16;
-    switch (glyph) {
-    case B_RENAME: g_pencil(c, gx, gy, col); break;
-    case B_DELETE: case B_EMPTY: g_trash(c, gx, gy, col); break;
-    case B_RESTORE: g_restore(c, gx, gy, col); break;
-    case B_SORT: g_sort(c, gx, gy, col); break;
-    case B_VIEW: g_view(c, gx, gy, e->list, col); break;
-    }
-    if (wide)
-        draw_text(c, FONT_UI13, x + 32, y + (32 - font_height(FONT_UI13)) / 2, label, col);
-    (void)id;
+    if (!focused)
+        return pal.dark ? ARGB(40, 255, 255, 255) : ARGB(60, 120, 135, 170);
+    return with_alpha(pal.accent, pal.dark ? 70 : 45);
 }
 
 static void draw_name_field(struct canvas *c, struct explorer *e, int x, int y, int w)
@@ -293,146 +310,119 @@ static const char *type_name(const char *path)
     return "Файл";
 }
 
-static void draw_pc(struct canvas *c, struct explorer *e, struct rect r, bool focused)
+/* A centred label of up to two lines under an icon. */
+static void icon_label(struct canvas *c, int cx, int y, int w, const char *name, uint32_t col)
 {
-    int x = r.x + 24, y = r.y + 16 - e->scroll;
-    char head[48];
-    if (e->loc == LOC_PC)
-        snprintf(head, sizeof head, "Папки (%d)", FOLDER_COUNT);
-    else
-        snprintf(head, sizeof head, "Диск в памяти (S:)");
-    draw_text(c, FONT_UI13B, x, y, head, OPAQUE(pal.text));
-    fill_rrect_px(c, (x + text_width(FONT_UI13B, head) + 12) * c->s, (y + 9) * c->s, (r.w - 72 - text_width(FONT_UI13B, head)) * c->s, 1, 0,
-                  OPAQUE(pal.separator));
-    y += 30;
-    int tw = 220, th = 72;
-    int cols = MAX(1, (r.w - 40) / (tw + 10));
-    e->ncells = 0;
-    for (int i = 0; i < FOLDER_COUNT; i++) {
-        int tx = x + (i % cols) * (tw + 10), ty = y + (i / cols) * (th + 8);
-        struct rect cell = { tx, ty, tw, th };
-        e->cells[e->ncells++] = cell;
-        bool sel = i == e->sel;
-        if (sel)
-            fill_rrect(c, tx, ty, tw, th, 6, focused ? with_alpha(pal.accent, 50) : OPAQUE(pal.selection));
-        else if (i == e->hover)
-            fill_rrect(c, tx, ty, tw, th, 6, hover_fill());
-        if (sel && focused)
-            stroke_rrect(c, tx, ty, tw, th, 6, with_alpha(pal.accent, 140));
-        draw_icon(c, folder_icon(i), tx + 10, ty + 8, 56, 255);
-        draw_text_fit(c, FONT_UI13, tx + 76, ty + 18, tw - 84, fs_folders[i], OPAQUE(pal.text));
-        char n[32];
-        int k = fs_count_in(i);
-        snprintf(n, sizeof n, "%d %s", k, k % 10 == 1 && k % 100 != 11 ? "файл" :
-                 (k % 10 >= 2 && k % 10 <= 4 && (k % 100 < 12 || k % 100 > 14)) ? "файла" : "файлов");
-        draw_text(c, FONT_UI12, tx + 76, ty + 38, n, OPAQUE(pal.text2));
+    const char *p = name, *brk = NULL;
+    while (*p) {
+        const char *q = p;
+        utf8_next(&q);
+        if (text_width_n(FONT_UI12, name, q - name) > w)
+            break;
+        if (*p == ' ' || *p == '.')
+            brk = p;
+        p = q;
     }
+    if (!*p) {
+        draw_text_center(c, FONT_UI12, cx, y, name, col);
+        return;
+    }
+    const char *end = brk && brk > name ? brk : p;
+    char a[FS_NAME_MAX];
+    int n = MIN((int)(end - name), FS_NAME_MAX - 1);
+    memcpy(a, name, n);
+    a[n] = 0;
+    const char *rest = end;
+    while (*rest == ' ')
+        rest++;
+    draw_text_center(c, FONT_UI12, cx, y, a, col);
+    int rw = MIN(text_width(FONT_UI12, rest), w);
+    draw_text_fit(c, FONT_UI12, cx - rw / 2, y + font_height(FONT_UI12), w, rest, col);
+}
+
+/* One folder or file in the icon grid. */
+static void grid_cell(struct canvas *c, struct explorer *e, int i, int x, int y, int cw, int ch, bool focused)
+{
+    struct rect cell = { x + 3, y, cw - 6, ch - 4 };
+    if (e->ncells < MAX_ITEMS)
+        e->cells[e->ncells++] = cell;
+    bool sel = i == e->sel;
+    if (sel)
+        fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 8, sel_fill(focused));
+    else if (i == e->hover)
+        fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 8, hover_fill());
+    int isz = 64;
+    draw_icon(c, item_icon(&e->items[i]), x + (cw - isz) / 2.0, y + 6, isz, e->dragging && sel ? 120 : 255);
+    if (sel && e->renaming)
+        draw_name_field(c, e, x + 2, y + 74, cw - 4);
+    else
+        icon_label(c, x + cw / 2, y + 74, cw - 10, fs_base(e->items[i].path), OPAQUE(pal.text));
+}
+
+static void draw_home(struct canvas *c, struct explorer *e, struct rect r, bool focused)
+{
+    int x0 = r.x + 22, y = r.y + 14 - e->scroll;
+    draw_text(c, FONT_UI13B, x0 + 2, y, e->loc == LOC_PC ? "Папки" : "Диск в памяти (S:)", OPAQUE(pal.text));
+    y += 26;
+    int cw = 104, ch = 106;
+    int cols = MAX(1, MIN(4, (r.w - 40) / cw));          /* 4 + 2, as in the design */
+    e->ncells = 0;
+    for (int i = 0; i < FOLDER_COUNT; i++)
+        grid_cell(c, e, i, x0 + (i % cols) * cw, y + (i / cols) * ch, cw, ch, focused);
     if (e->loc != LOC_PC)
         return;
-    y += ((FOLDER_COUNT + cols - 1) / cols) * (th + 8) + 18;
-    draw_text(c, FONT_UI13B, x, y, "Устройства и диски (1)", OPAQUE(pal.text));
-    int hw = text_width(FONT_UI13B, "Устройства и диски (1)");
-    fill_rrect_px(c, (x + hw + 12) * c->s, (y + 9) * c->s, (r.w - 72 - hw) * c->s, 1, 0, OPAQUE(pal.separator));
-    y += 30;
-    struct rect cell = { x, y, 330, 84 };
+    y += ((FOLDER_COUNT + cols - 1) / cols) * ch + 14;
+    draw_text(c, FONT_UI13B, x0 + 2, y, "Устройства и диски", OPAQUE(pal.text));
+    y += 26;
+    struct rect cell = { x0, y, 320, 70 };
     e->cells[e->ncells++] = cell;
     int di = FOLDER_COUNT;
     if (e->sel == di)
-        fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 6, focused ? with_alpha(pal.accent, 50) : OPAQUE(pal.selection));
+        fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 8, sel_fill(focused));
     else if (e->hover == di)
-        fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 6, hover_fill());
-    draw_icon(c, ICON_DRIVE, cell.x + 10, cell.y + 12, 60, 255);
-    draw_text(c, FONT_UI13, cell.x + 82, cell.y + 12, "Диск в памяти (S:)", OPAQUE(pal.text));
+        fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 8, hover_fill());
+    draw_icon(c, ICON_DRIVE, cell.x + 8, cell.y + 7, 56, 255);
+    draw_text(c, FONT_UI13, cell.x + 76, cell.y + 10, "Диск в памяти (S:)", OPAQUE(pal.text));
     uint64_t total = mm_heap_size(), used = mm_heap_used();
-    int bw = cell.w - 100;
+    int bw = cell.w - 92;
     double k = total ? (double)used / total : 0;
-    fill_rect(c, cell.x + 82, cell.y + 36, bw, 12, OPAQUE(pal.dark ? 0x3A3A3E : 0xE6E6E6));
-    stroke_rrect(c, cell.x + 82, cell.y + 36, bw, 12, 0, OPAQUE(pal.dark ? 0x4A4A4E : 0xBCBCBC));
+    fill_rrect(c, cell.x + 76, cell.y + 32, bw, 6, 3, pal.dark ? ARGB(60, 255, 255, 255) : ARGB(255, 0xDC, 0xE2, 0xEE));
     int fw = (int)(bw * k + 0.5);
-    if (fw > 0)
-        fill_rect(c, cell.x + 83, cell.y + 37, MIN(MAX(fw, 2), bw - 2), 10, OPAQUE(k > 0.9 ? 0xDA3B01 : 0x26A0DA));
+    fill_rrect(c, cell.x + 76, cell.y + 32, MAX(fw, 6), 6, 3, OPAQUE(k > 0.9 ? 0xE5484D : 0x2F7CF6));
     char line[64], fr[24], tt[24];
     format_size(total - used, fr, sizeof fr);
     format_size(total, tt, sizeof tt);
     snprintf(line, sizeof line, "%s свободно из %s", fr, tt);
-    draw_text(c, FONT_UI12, cell.x + 82, cell.y + 54, line, OPAQUE(pal.text2));
+    draw_text(c, FONT_UI11, cell.x + 76, cell.y + 44, line, OPAQUE(pal.text2));
 }
 
 static void draw_files(struct canvas *c, struct explorer *e, struct rect r, bool focused)
 {
     e->ncells = 0;
     if (!e->count) {
-        const char *msg = e->search.len ? "Ничего не найдено." : e->loc == LOC_TRASH ? "Корзина пуста." : "Эта папка пуста.";
-        draw_text_center(c, FONT_UI13, r.x + r.w / 2, r.y + 40, msg, OPAQUE(pal.text2));
+        const char *msg = e->search.len ? "Ничего не найдено" : e->loc == LOC_TRASH ? "Корзина пуста" : "Эта папка пуста";
+        draw_text_center(c, FONT_UI13, r.x + r.w / 2, r.y + r.h / 2 - 20, msg, OPAQUE(pal.text2));
         return;
     }
     if (!e->list) {
         int cw = 104, ch = 112;
-        int cols = MAX(1, (r.w - 24) / cw);
-        for (int i = 0; i < e->count; i++) {
-            int x = r.x + 12 + (i % cols) * cw, y = r.y + 10 + (i / cols) * ch - e->scroll;
-            struct rect cell = { x + 2, y, cw - 4, ch - 6 };
-            if (e->ncells < MAX_ITEMS)
-                e->cells[e->ncells++] = cell;
-            bool sel = i == e->sel;
-            if (sel)
-                fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 6, focused ? with_alpha(pal.accent, 50) : OPAQUE(pal.selection));
-            else if (i == e->hover)
-                fill_rrect(c, cell.x, cell.y, cell.w, cell.h, 6, hover_fill());
-            if (sel && focused)
-                stroke_rrect(c, cell.x, cell.y, cell.w, cell.h, 6, with_alpha(pal.accent, 140));
-            draw_icon(c, item_icon(&e->items[i]), x + (cw - 64) / 2.0, y + 6, 64, e->dragging && sel ? 120 : 255);
-            const char *name = fs_base(e->items[i].path);
-            if (sel && e->renaming) {
-                draw_name_field(c, e, x + 2, y + 74, cw - 4);
-                continue;
-            }
-            /* two centred lines */
-            int lw = cw - 10;
-            const char *p = name, *brk = NULL;
-            while (*p) {
-                const char *q = p;
-                utf8_next(&q);
-                if (text_width_n(FONT_UI12, name, q - name) > lw)
-                    break;
-                if (*p == ' ' || *p == '.')
-                    brk = p;
-                p = q;
-            }
-            if (!*p) {
-                draw_text_center(c, FONT_UI12, x + cw / 2, y + 74, name, OPAQUE(pal.text));
-            } else {
-                const char *end = brk && brk > name ? brk : p;
-                char a[FS_NAME_MAX];
-                int n = MIN((int)(end - name), FS_NAME_MAX - 1);
-                memcpy(a, name, n);
-                a[n] = 0;
-                const char *rest = end;
-                while (*rest == ' ')
-                    rest++;
-                draw_text_center(c, FONT_UI12, x + cw / 2, y + 74, a, OPAQUE(pal.text));
-                int rw = MIN(text_width(FONT_UI12, rest), lw);
-                draw_text_fit(c, FONT_UI12, x + cw / 2 - rw / 2, y + 74 + font_height(FONT_UI12), lw, rest, OPAQUE(pal.text));
-            }
-        }
+        int cols = MAX(1, (r.w - 32) / cw);
+        for (int i = 0; i < e->count; i++)
+            grid_cell(c, e, i, r.x + 16 + (i % cols) * cw, r.y + 12 + (i / cols) * ch - e->scroll, cw, ch, focused);
         return;
     }
-    /* details */
+    /* table */
     int x0 = r.x + 12, W = r.w - 24;
     int c_name = x0 + 34, c_date = x0 + W * 46 / 100, c_type = x0 + W * 68 / 100, c_size = x0 + W - 12;
-    int y0 = r.y;
-    fill_rect(c, r.x, y0, r.w, 30, OPAQUE(pal.win_bg));
+    int y0 = r.y + 4;
     const char *col3 = e->loc == LOC_TRASH ? "Исходная папка" : "Тип";
     draw_text(c, FONT_UI12, c_name, y0 + 8, "Имя", OPAQUE(pal.text2));
     draw_text(c, FONT_UI12, c_date, y0 + 8, "Дата изменения", OPAQUE(pal.text2));
     draw_text(c, FONT_UI12, c_type, y0 + 8, col3, OPAQUE(pal.text2));
     draw_text(c, FONT_UI12, c_size - text_width(FONT_UI12, "Размер"), y0 + 8, "Размер", OPAQUE(pal.text2));
-    for (int k = 0; k < 3; k++) {
-        int sx = k == 0 ? c_date - 10 : k == 1 ? c_type - 10 : c_size - 90;
-        fill_rrect_px(c, sx * c->s, (y0 + 6) * c->s, 1, 18 * c->s, 0, OPAQUE(pal.separator));
-    }
+    fill_rrect_px(c, x0 * c->s, (y0 + 30) * c->s - 1, W * c->s, 1, 0, pal.dark ? ARGB(40, 255, 255, 255) : ARGB(30, 0, 0, 0));
     struct canvas cl = *c;
-    cv_clip_pt(&cl, r.x, y0 + 30, r.w, r.h - 30);
+    cv_clip_pt(&cl, r.x, y0 + 30, r.w, r.h - 34);
     for (int i = 0; i < e->count; i++) {
         int y = y0 + 32 + i * 30 - e->scroll;
         struct rect cell = { x0, y, W, 28 };
@@ -442,22 +432,18 @@ static void draw_files(struct canvas *c, struct explorer *e, struct rect r, bool
             continue;
         bool sel = i == e->sel;
         if (sel)
-            fill_rrect(&cl, x0, y, W, 28, 4, focused ? with_alpha(pal.accent, 50) : OPAQUE(pal.selection));
+            fill_rrect(&cl, x0, y, W, 28, 6, sel_fill(focused));
         else if (i == e->hover)
-            fill_rrect(&cl, x0, y, W, 28, 4, hover_fill());
-        if (sel && focused)
-            fill_rrect(&cl, x0, y + 7, 3, 14, 1, OPAQUE(pal.accent));
+            fill_rrect(&cl, x0, y, W, 28, 6, hover_fill());
         const struct item *it = &e->items[i];
-        draw_icon(&cl, item_icon(it), x0 + 10, y + 5, 18, 255);
+        draw_icon(&cl, item_icon(it), x0 + 8, y + 4, 20, 255);
         int ty = y + (28 - font_height(FONT_UI13)) / 2;
         if (sel && e->renaming)
             draw_name_field(&cl, e, c_name - 4, y + 3, c_date - c_name - 16);
         else
             draw_text_fit(&cl, FONT_UI13, c_name, ty, c_date - c_name - 16, fs_base(it->path), OPAQUE(pal.text));
         char when[48], sz[24];
-        struct rtc_time t;
-        time_split(item_time(it), &t);
-        snprintf(when, sizeof when, "%02d.%02d.%04d %d:%02d", t.day, t.month, t.year, t.hour, t.min);
+        format_when(item_time(it), when, sizeof when);
         draw_text_fit(&cl, FONT_UI12, c_date, ty + 1, c_type - c_date - 12, when, OPAQUE(pal.text2));
         const char *third = e->loc == LOC_TRASH && it->folder >= 0 ? fs_folders[it->folder] : type_name(it->path);
         draw_text_fit(&cl, FONT_UI12, c_type, ty + 1, c_size - c_type - 96, third, OPAQUE(pal.text2));
@@ -475,157 +461,113 @@ static void explorer_draw(struct window *w, struct canvas *c)
     int W = w->w, H = w->h;
     uint32_t tc = OPAQUE(pal.text), t3 = OPAQUE(pal.text3);
 
-    /* row 1: window buttons, navigation, address, search */
-    fill_rect(c, 0, 0, W, ROW1, OPAQUE(pal.title_bg));
-    int bx = 84;
-    const int nav_btn[3] = { B_BACK, B_FWD, B_UP };
-    bool can[3] = { e->hpos > 0, e->hpos + 1 < e->hlen, e->loc >= 0 || e->loc == LOC_DRIVE };
-    for (int i = 0; i < 3; i++) {
-        e->btn[nav_btn[i]] = (struct rect){ bx + i * 34, 10, 30, 30 };
-        g_arrow(c, bx + i * 34 + 15, 25, i, can[i] ? tc : t3);
+    /* the window is a sheet of tinted glass over the wallpaper */
+    mica_fill(c, w, 0, 0, W, H, pal.dark ? ARGB(205, 30, 32, 44) : ARGB(178, 236, 240, 252));
+    mica_fill(c, w, SIDE_W, TITLE_H, W - SIDE_W, H - TITLE_H, pal.dark ? ARGB(225, 34, 36, 48) : ARGB(222, 250, 251, 255));
+    uint32_t line = pal.dark ? ARGB(40, 255, 255, 255) : ARGB(26, 30, 40, 80);
+    fill_rrect_px(c, 0, TITLE_H * c->s - 1, W * c->s, 1, 0, line);
+    fill_rrect_px(c, SIDE_W * c->s - 1, TITLE_H * c->s, 1, (H - TITLE_H) * c->s, 0, line);
+
+    /* title */
+    draw_icon(c, loc_icon(e->loc), 82, TITLE_H / 2.0 - 9, 18, 255);
+    draw_text_fit(c, FONT_UI13B, 106, (TITLE_H - font_height(FONT_UI13B)) / 2, W - 220, loc_name(e->loc), tc);
+
+    /* navigation row: back, forward, path, new, view, search */
+    int ny = TITLE_H + (BAR_H - 30) / 2;
+    int bx = SIDE_W + 12;
+    bool can_back = e->hpos > 0, can_fwd = e->hpos + 1 < e->hlen;
+    e->btn[B_BACK] = (struct rect){ bx, ny, 30, 30 };
+    e->btn[B_FWD] = (struct rect){ bx + 32, ny, 30, 30 };
+    for (int i = 0; i < 2; i++) {
+        struct rect b = e->btn[i];
+        if (e->btn_hover == i && (i ? can_fwd : can_back))
+            fill_rrect(c, b.x, b.y, b.w, b.h, 6, hover_fill());
+        g_chevron(c, b.x + 15, b.y + 15, i == 0, (i ? can_fwd : can_back) ? tc : t3);
     }
-    int sw = MIN(240, W / 4);
-    struct rect addr = { bx + 108, 9, W - (bx + 108) - sw - 24, 32 };
-    fill_rrect(c, addr.x, addr.y, addr.w, addr.h, 6, OPAQUE(pal.field));
-    stroke_rrect(c, addr.x, addr.y, addr.w, addr.h, 6, OPAQUE(pal.control_line));
-    draw_icon(c, loc_icon(e->loc), addr.x + 10, addr.y + 7, 18, 255);
-    int ax = addr.x + 36, ay = addr.y + (32 - font_height(FONT_UI13)) / 2;
-    struct canvas ca = *c;
-    cv_clip_pt(&ca, addr.x, addr.y, addr.w - 4, addr.h);
-    if (e->loc != LOC_TRASH) {
-        draw_text(&ca, FONT_UI13, ax, ay, "Этот компьютер", e->loc == LOC_PC ? tc : OPAQUE(pal.text2));
-        ax += text_width(FONT_UI13, "Этот компьютер") + 10;
-        if (e->loc != LOC_PC) {
-            ui_chevron(&ca, ax + 2, addr.y + 16, 7, false, OPAQUE(pal.text2));
-            ax += 14;
-            draw_text(&ca, FONT_UI13, ax, ay, e->loc == LOC_DRIVE ? "Диск в памяти (S:)" : fs_folders[e->loc], tc);
-        }
+    int px = bx + 76, py = TITLE_H + (BAR_H - font_height(FONT_UI13)) / 2;
+    int sw = MIN(220, W / 4);
+    e->f_search = (struct rect){ W - 16 - sw, ny, sw, 30 };
+    int right = e->f_search.x - 8;
+    e->btn[B_VIEW] = (struct rect){ right - 32, ny, 30, 30 };
+    e->btn[B_NEW] = e->loc >= 0 ? (struct rect){ right - 66, ny, 30, 30 } : (struct rect){ 0, 0, 0, 0 };
+    for (int i = B_NEW; i <= B_VIEW; i++) {
+        struct rect b = e->btn[i];
+        if (rect_empty(b))
+            continue;
+        if (e->btn_hover == i)
+            fill_rrect(c, b.x, b.y, b.w, b.h, 6, hover_fill());
+        if (i == B_NEW)
+            g_plus(c, b.x + 15, b.y + 15, tc);
+        else
+            g_view(c, b.x + 15, b.y + 15, !e->list, tc);
+    }
+    struct canvas cp = *c;
+    cv_clip_pt(&cp, px, TITLE_H, (rect_empty(e->btn[B_NEW]) ? e->btn[B_VIEW].x : e->btn[B_NEW].x) - px - 6, BAR_H);
+    if (e->loc >= 0 || e->loc == LOC_DRIVE) {
+        draw_text(&cp, FONT_UI13, px, py, "Этот компьютер", OPAQUE(pal.text2));
+        int x2 = px + text_width(FONT_UI13, "Этот компьютер") + 8;
+        ui_chevron(&cp, x2 + 3, TITLE_H + BAR_H / 2.0, 6, false, OPAQUE(pal.text3));
+        draw_text(&cp, FONT_UI13, x2 + 14, py, loc_name(e->loc), tc);
     } else {
-        draw_text(&ca, FONT_UI13, ax, ay, "Корзина", tc);
+        draw_text(&cp, FONT_UI13, px, py, loc_name(e->loc), OPAQUE(pal.text2));
     }
-    e->f_search = (struct rect){ W - 16 - sw, 9, sw, 32 };
     struct rect f = e->f_search;
-    fill_rrect(c, f.x, f.y, f.w, f.h, 6, OPAQUE(pal.field));
-    stroke_rrect(c, f.x, f.y, f.w, f.h, 6, OPAQUE(e->search_focus ? pal.accent : pal.control_line));
+    fill_rrect(c, f.x, f.y, f.w, f.h, 15, pal.dark ? ARGB(255, 0x2C, 0x2E, 0x3C) : ARGB(255, 0xEE, 0xF1, 0xF7));
     if (e->search_focus)
-        fill_rrect(c, f.x + 6, f.y + f.h - 2, f.w - 12, 2, 1, OPAQUE(pal.accent));
+        stroke_rrect(c, f.x, f.y, f.w, f.h, 15, with_alpha(pal.accent, 200));
+    uint32_t ic = OPAQUE(pal.text2);
+    stroke_circle(c, f.x + 16, f.y + 14, 4.8, 1.4, ic);
+    draw_line(c, f.x + 19.5, f.y + 17.5, f.x + 23, f.y + 21, 1.6, ic);
     char ph[96];
     snprintf(ph, sizeof ph, "Поиск: %s", loc_name(e->loc));
     struct canvas cs = *c;
-    cv_clip_pt(&cs, f.x, f.y, f.w - 30, f.h);
-    int fy = f.y + (32 - font_height(FONT_UI13)) / 2;
+    cv_clip_pt(&cs, f.x + 30, f.y, f.w - 40, f.h);
+    int fy = f.y + (30 - font_height(FONT_UI12)) / 2;
     if (e->search.len)
-        draw_text(&cs, FONT_UI13, f.x + 12, fy, e->search.buf, tc);
+        draw_text(&cs, FONT_UI12, f.x + 30, fy, e->search.buf, tc);
     else
-        draw_text_fit(&cs, FONT_UI13, f.x + 12, fy, f.w - 44, ph, t3);
+        draw_text_fit(&cs, FONT_UI12, f.x + 30, fy, f.w - 40, ph, t3);
     if (e->search_focus) {
-        int cx = f.x + 12 + text_width_n(FONT_UI13, e->search.buf, e->search.cur);
-        fill_rect(&cs, cx, fy + 1, 1, font_height(FONT_UI13) - 2, tc);
-    }
-    stroke_circle(c, f.x + f.w - 19, f.y + 15, 5, 1.4, OPAQUE(pal.text2));
-    draw_line(c, f.x + f.w - 15.5, f.y + 18.5, f.x + f.w - 11.5, f.y + 22.5, 1.6, OPAQUE(pal.text2));
-
-    /* row 2: command bar */
-    fill_rect(c, 0, ROW1, W, ROW2, OPAQUE(pal.win_bg));
-    fill_rrect_px(c, 0, ROW1 * c->s, W * c->s, 1, 0, OPAQUE(pal.separator));
-    fill_rrect_px(c, 0, TOP * c->s - 1, W * c->s, 1, 0, OPAQUE(pal.separator));
-    int x = 14, y = ROW1 + 6;
-    for (int i = B_NEW; i < B_COUNT; i++)
-        e->btn[i] = (struct rect){ 0, 0, 0, 0 };
-    bool has_sel = e->sel >= 0 && e->sel < e->count && e->items[e->sel].kind == IT_FILE;
-    {
-        const char *lbl = "Создать";
-        int nw = text_width(FONT_UI13, lbl) + 40;
-        bool can_new = e->loc >= 0;
-        if (can_new)
-            e->btn[B_NEW] = (struct rect){ x, y, nw, 32 };
-        fill_rrect(c, x, y, nw, 32, 6, can_new ? OPAQUE(pal.accent) : OPAQUE(pal.dark ? 0x3A3A3E : 0xEDEDF0));
-        uint32_t fg = can_new ? 0xFFFFFFFF : t3;
-        g_plus(c, x + 16, y + 16, fg);
-        draw_text(c, FONT_UI13, x + 30, y + (32 - font_height(FONT_UI13)) / 2, lbl, fg);
-        x += nw + 12;
-        fill_rrect_px(c, x * c->s, (y + 6) * c->s, 1, 20 * c->s, 0, OPAQUE(pal.separator));
-        x += 12;
-    }
-    if (e->loc == LOC_TRASH) {
-        cmd_button(c, &e->btn[B_RESTORE], x, y, "Восстановить", B_RESTORE, has_sel, true, e, B_RESTORE);
-        x += e->btn[B_RESTORE].w + 6;
-        cmd_button(c, &e->btn[B_EMPTY], x, y, "Очистить корзину", B_EMPTY, e->count > 0, true, e, B_EMPTY);
-        x += e->btn[B_EMPTY].w + 6;
-    } else {
-        cmd_button(c, &e->btn[B_RENAME], x, y, "Переименовать", B_RENAME, has_sel, true, e, B_RENAME);
-        x += e->btn[B_RENAME].w + 6;
-        cmd_button(c, &e->btn[B_DELETE], x, y, "Удалить", B_DELETE, has_sel, true, e, B_DELETE);
-        x += e->btn[B_DELETE].w + 6;
-    }
-    {
-        static const char *const sorts[] = { "По имени", "По дате", "По размеру" };
-        bool fv = is_folder_view(e);
-        int rx = W - 14;
-        int vw = text_width(FONT_UI13, "Вид") + 40;
-        rx -= vw;
-        cmd_button(c, &e->btn[B_VIEW], rx, y, "Вид", B_VIEW, fv, true, e, B_VIEW);
-        int sw2 = text_width(FONT_UI13, sorts[e->sort]) + 40;
-        rx -= sw2 + 6;
-        if (rx > x + 10)
-            cmd_button(c, &e->btn[B_SORT], rx, y, sorts[e->sort], B_SORT, fv, true, e, B_SORT);
-        if (!fv)
-            e->btn[B_VIEW] = e->btn[B_SORT] = (struct rect){ 0, 0, 0, 0 };
+        int cx = f.x + 30 + text_width_n(FONT_UI12, e->search.buf, e->search.cur);
+        fill_rect(&cs, cx, fy + 1, 1, font_height(FONT_UI12) - 2, tc);
     }
 
-    /* navigation pane */
-    int nh = H - TOP - STATUS;
-    fill_rect(c, 0, TOP, NAV_W, nh, OPAQUE(pal.dark ? 0x232326 : 0xF7F7F9));
-    fill_rrect_px(c, NAV_W * c->s - 1, TOP * c->s, 1, nh * c->s, 0, OPAQUE(pal.separator));
-    int ny = TOP + 10;
-    for (int i = 0; i < 8; i++) {
-        if (i == 6) {
-            fill_rrect_px(c, 14 * c->s, (ny + 5) * c->s, (NAV_W - 28) * c->s, 1, 0, OPAQUE(pal.separator));
-            ny += 12;
+    /* side bar */
+    int sy = TITLE_H + 10;
+    uint32_t gcol = pal.dark ? 0xFFC9D0E6 : 0xFF46506A, blue = OPAQUE(pal.accent);
+    for (int i = 0; i < NAV_N; i++) {
+        if (nav_items[i].header) {
+            sy += 8;
+            draw_text(c, FONT_UI11, 18, sy, nav_items[i].header, OPAQUE(pal.text3));
+            sy += 20;
         }
-        int loc = nav_loc[i];
-        struct rect r = { 8, ny, NAV_W - 16, 30 };
+        int loc = nav_items[i].loc;
+        struct rect r = { 8, sy, SIDE_W - 16, 28 };
         e->nav[i] = r;
-        bool on = loc == e->loc || (loc == LOC_PC && e->loc == LOC_DRIVE);
+        bool on = loc == e->loc;
         if (e->dragging && e->drop_nav == i)
-            fill_rrect(c, r.x, r.y, r.w, r.h, 5, with_alpha(pal.accent, 80));
+            fill_rrect(c, r.x, r.y, r.w, r.h, 6, with_alpha(pal.accent, 90));
         else if (on)
-            fill_rrect(c, r.x, r.y, r.w, r.h, 5, OPAQUE(pal.dark ? 0x3A3A3E : 0xE5E5EA));
-        if (on)
-            fill_rrect(c, r.x, r.y + 8, 3, 14, 1, OPAQUE(pal.accent));
-        int ic = loc == LOC_TRASH ? ICON_TRASH : loc_icon(loc);
-        draw_icon(c, ic, r.x + 14, r.y + 6, 18, 255);
-        draw_text_fit(c, FONT_UI13, r.x + 42, r.y + (30 - font_height(FONT_UI13)) / 2, r.w - 48, loc_name(loc), tc);
-        ny += 32;
+            fill_rrect(c, r.x, r.y, r.w, r.h, 6, pal.dark ? ARGB(45, 255, 255, 255) : ARGB(70, 110, 130, 180));
+        else if (e->nav_hover == i)
+            fill_rrect(c, r.x, r.y, r.w, r.h, 6, hover_fill());
+        side_glyph(c, nav_items[i].glyph, r.x + 10, r.y + 6, gcol, blue);
+        draw_text_fit(c, FONT_UI13, r.x + 36, r.y + (28 - font_height(FONT_UI13)) / 2, r.w - 42, loc_name(loc), tc);
+        sy += 30;
     }
 
     /* content */
-    e->content = (struct rect){ NAV_W, TOP, W - NAV_W, nh };
+    e->content = (struct rect){ SIDE_W, TOP, W - SIDE_W, H - TOP };
     struct canvas cc = *c;
     cv_clip_pt(&cc, e->content.x, e->content.y, e->content.w, e->content.h);
-    if ((e->loc == LOC_PC || e->loc == LOC_DRIVE) && !e->search.len)
-        draw_pc(&cc, e, e->content, focused);
+    if (home_view(e))
+        draw_home(&cc, e, e->content, focused);
     else
         draw_files(&cc, e, e->content, focused);
 
-    /* status bar */
-    fill_rect(c, 0, H - STATUS, W, STATUS, OPAQUE(pal.win_bg));
-    fill_rrect_px(c, 0, (H - STATUS) * c->s, W * c->s, 1, 0, OPAQUE(pal.separator));
-    char st[96];
-    int n = (e->loc == LOC_PC || e->loc == LOC_DRIVE) && !e->search.len ? e->count : e->count;
-    snprintf(st, sizeof st, "Элементов: %d", n);
-    if (e->sel >= 0 && e->sel < e->count && e->items[e->sel].kind == IT_FILE) {
-        char sz[24];
-        format_size(item_size(&e->items[e->sel]), sz, sizeof sz);
-        int l = strlen(st);
-        snprintf(st + l, sizeof st - l, "    Выбран 1 элемент: %s", sz);
-    }
-    draw_text(c, FONT_UI12, 14, H - STATUS + (STATUS - font_height(FONT_UI12)) / 2, st, OPAQUE(pal.text2));
-
     /* the dragged file follows the pointer */
-    if (e->dragging && e->sel >= 0) {
+    if (e->dragging && e->sel >= 0)
         draw_icon(c, item_icon(&e->items[e->sel]), e->mx - 24, e->my - 24, 48, 200);
-    }
 }
 
 /* ---- actions ---- */
@@ -651,7 +593,17 @@ static void open_item(struct window *w, int i)
         open_file(it.path);
 }
 
-static void start_rename(struct explorer *e, const char *name);
+static void start_rename(struct explorer *e, const char *name)
+{
+    e->renaming = true;
+    tf_set(&e->ren, name);
+    const char *dot = NULL;
+    for (const char *p = name; *p; p++)
+        if (*p == '.')
+            dot = p;
+    e->ren_sel = dot && dot > name ? (int)(dot - name) : e->ren.len;
+    e->ren.cur = e->ren_sel;
+}
 
 static void new_file(struct window *w)
 {
@@ -667,18 +619,6 @@ static void new_file(struct window *w)
         if (!strcmp(e->items[i].path, path))
             e->sel = i;
     start_rename(e, fs_base(path));
-}
-
-static void start_rename(struct explorer *e, const char *name)
-{
-    e->renaming = true;
-    tf_set(&e->ren, name);
-    const char *dot = NULL;
-    for (const char *p = name; *p; p++)
-        if (*p == '.')
-            dot = p;
-    e->ren_sel = dot && dot > name ? (int)(dot - name) : e->ren.len;
-    e->ren.cur = e->ren_sel;
 }
 
 /* Typing over the selected part of the name replaces it. */
@@ -821,7 +761,7 @@ static int cell_at(struct explorer *e, int x, int y)
 {
     if (!rect_has(e->content, x, y))
         return -1;
-    if (e->list && is_folder_view(e) && y < e->content.y + 30)
+    if (e->list && is_folder_view(e) && y < e->content.y + 34)
         return -1;
     for (int i = 0; i < e->ncells; i++)
         if (rect_has(e->cells[i], x, y))
@@ -831,8 +771,16 @@ static int cell_at(struct explorer *e, int x, int y)
 
 static int nav_at(struct explorer *e, int x, int y)
 {
-    for (int i = 0; i < 8; i++)
+    for (int i = 0; i < NAV_N; i++)
         if (rect_has(e->nav[i], x, y))
+            return i;
+    return -1;
+}
+
+static int button_at(struct explorer *e, int x, int y)
+{
+    for (int i = 0; i < B_COUNT; i++)
+        if (!rect_empty(e->btn[i]) && rect_has(e->btn[i], x, y))
             return i;
     return -1;
 }
@@ -843,7 +791,7 @@ static void drop(struct window *w, int nav)
     struct item *it = selected(e);
     if (!it || it->kind != IT_FILE || nav < 0)
         return;
-    int loc = nav_loc[nav];
+    int loc = nav_items[nav].loc;
     if (loc == LOC_TRASH) {
         fs_trash(it->path, true);
     } else if (loc >= 0 && loc != it->folder) {
@@ -866,9 +814,10 @@ static bool explorer_mouse(struct window *w, const struct mevent *ev)
     if (ev->type == EV_WHEEL) {
         if (rect_has(e->content, x, y)) {
             e->scroll = MAX(0, e->scroll + ev->wheel * 36);
-            int rows = e->list ? e->count * 30 + 40 : ((e->count + 3) / 4) * 112 + 40;
-            if ((e->loc == LOC_PC || e->loc == LOC_DRIVE) && !e->search.len)
-                rows = 500;
+            int cols = MAX(1, (e->content.w - 32) / 104);
+            int rows = e->list ? e->count * 30 + 50 : ((e->count + cols - 1) / cols) * 112 + 40;
+            if (home_view(e))
+                rows = 420;
             e->scroll = MIN(e->scroll, MAX(0, rows - e->content.h + 20));
             win_redraw(w);
         }
@@ -886,9 +835,11 @@ static bool explorer_mouse(struct window *w, const struct mevent *ev)
             }
             return true;
         }
-        int h = cell_at(e, x, y);
-        if (h != e->hover) {
+        int h = cell_at(e, x, y), nh = nav_at(e, x, y), bh = button_at(e, x, y);
+        if (h != e->hover || nh != e->nav_hover || bh != e->btn_hover) {
             e->hover = h;
+            e->nav_hover = nh;
+            e->btn_hover = bh;
             win_redraw(w);
         }
         return true;
@@ -902,49 +853,40 @@ static bool explorer_mouse(struct window *w, const struct mevent *ev)
     }
     if (ev->type != EV_DOWN)
         return false;
-    /* title row */
-    if (y < ROW1) {
-        bool hit = false;
-        if (rect_has(e->btn[B_BACK], x, y))
-            do_action(w, ACT_BACK), hit = true;
-        else if (rect_has(e->btn[B_FWD], x, y))
-            do_action(w, ACT_FORWARD), hit = true;
-        else if (rect_has(e->btn[B_UP], x, y))
-            do_action(w, ACT_UP), hit = true;
-        bool sf = rect_has(e->f_search, x, y);
-        if (sf != e->search_focus) {
-            finish_rename(e, true);
-            e->search_focus = sf;
-            win_redraw(w);
-        }
-        return hit || sf;             /* otherwise the window manager drags the window */
+    if (y < TITLE_H)
+        return false;                 /* the window manager moves the window */
+    bool sf = rect_has(e->f_search, x, y);
+    if (sf != e->search_focus) {
+        finish_rename(e, true);
+        e->search_focus = sf;
+        win_redraw(w);
     }
-    e->search_focus = false;
-    if (y < TOP) {
-        for (int i = B_NEW; i < B_COUNT; i++)
-            if (!rect_empty(e->btn[i]) && rect_has(e->btn[i], x, y)) {
-                finish_rename(e, true);
-                switch (i) {
-                case B_NEW: do_action(w, ACT_NEW); break;
-                case B_RENAME: do_action(w, ACT_RENAME); break;
-                case B_DELETE: do_action(w, ACT_TRASH); break;
-                case B_RESTORE: do_action(w, ACT_RESTORE); break;
-                case B_EMPTY: if (e->count) do_action(w, ACT_EMPTY); break;
-                case B_SORT: e->sort = (e->sort + 1) % 3; refresh(e); break;
-                case B_VIEW: e->list = !e->list; e->scroll = 0; break;
-                }
-            }
+    if (sf)
+        return true;
+    int b = button_at(e, x, y);
+    if (b >= 0) {
+        finish_rename(e, true);
+        if (b == B_BACK)
+            do_action(w, ACT_BACK);
+        else if (b == B_FWD)
+            do_action(w, ACT_FORWARD);
+        else if (b == B_NEW)
+            do_action(w, ACT_NEW);
+        else
+            do_action(w, e->list ? ACT_ICONS : ACT_LIST);
         win_redraw(w);
         return true;
     }
-    if (x < NAV_W && y < w->h - STATUS) {
+    if (x < SIDE_W) {
         int i = nav_at(e, x, y);
         finish_rename(e, true);
         if (i >= 0)
-            go(w, nav_loc[i], true);
+            go(w, nav_items[i].loc, true);
         win_redraw(w);
         return true;
     }
+    if (y < TOP)
+        return true;
     int i = cell_at(e, x, y);
     if (e->renaming && i != e->sel)
         finish_rename(e, true);
@@ -972,9 +914,9 @@ static int grid_cols(struct window *w)
     struct explorer *e = w->data;
     if (e->list && is_folder_view(e))
         return 1;
-    if ((e->loc == LOC_PC || e->loc == LOC_DRIVE) && !e->search.len)
-        return MAX(1, (e->content.w - 40) / 230);
-    return MAX(1, (e->content.w - 24) / 104);
+    if (home_view(e))
+        return MAX(1, MIN(4, (e->content.w - 40) / 104));
+    return MAX(1, (e->content.w - 32) / 104);
 }
 
 static void explorer_key(struct window *w, const struct key *k)
@@ -1060,9 +1002,12 @@ static void explorer_menu(struct window *w, int action)
     do_action(w, action);
 }
 
+static int open_count;
+
 static void explorer_closed(struct window *w)
 {
     kfree(w->data);
+    open_count--;
 }
 
 static void explorer_resized(struct window *w)
@@ -1075,21 +1020,28 @@ void explorer_open(int loc)
     struct explorer *e = kzalloc(sizeof *e);
     if (!e)
         return;
-    e->sel = e->hover = -1;
+    e->sel = e->hover = e->nav_hover = e->btn_hover = -1;
     e->drop_nav = -1;
     e->hist[0] = loc;
     e->hlen = 1;
     e->loc = loc;
     refresh(e);
-    struct window *w = win_open(&app_files, loc_name(loc), 920, 580, WF_RESIZABLE | WF_CUSTOM_TITLE | WF_HIDE_TITLE);
+    struct window *w = win_open(&app_files, loc_name(loc), 780, 500,
+                                WF_RESIZABLE | WF_CUSTOM_TITLE | WF_HIDE_TITLE | WF_MICA);
     if (!w) {
         kfree(e);
         return;
     }
+    if (open_count++ == 0) {
+        /* the first Explorer opens next to the desktop icons, as in the design */
+        struct rect area = desktop_area();
+        w->x = MIN(118, MAX(4, gui_screen_w() - w->w - 4));
+        w->y = area.y + 20;
+    }
     w->min_w = 640;
     w->min_h = 380;
-    w->title_h = ROW1;
-    w->tl_y = 25;
+    w->title_h = TITLE_H;
+    w->tl_y = TITLE_H / 2;
     w->data = e;
     w->draw = explorer_draw;
     w->mouse = explorer_mouse;
@@ -1130,6 +1082,7 @@ static const struct menu_item file_menu[] = {
     { "Переименовать", "F2", ACT_RENAME },
     { "", NULL, MENU_SEP },
     { "Удалить", "Del", ACT_TRASH },
+    { "Восстановить из Корзины", NULL, ACT_RESTORE },
     { "Очистить корзину…", NULL, ACT_EMPTY },
     { NULL, NULL, 0 },
 };
@@ -1145,7 +1098,7 @@ static const struct menu_item view_menu[] = {
 static const struct menu_item go_menu[] = {
     { "Назад", "Alt ←", ACT_BACK },
     { "Вперёд", NULL, ACT_FORWARD },
-    { "Вверх", "Backspace", ACT_UP },
+    { "Этот компьютер", "Backspace", ACT_UP },
     { NULL, NULL, 0 },
 };
 static const struct menu files_menus[] = {

@@ -45,6 +45,7 @@ enum icon_id {
     ICON_PHOTOS,
     ICON_PLAYER,
     ICON_CALENDAR,
+    ICON_RECYCLE,
     ICON_IMAGE_FILE,
     ICON_AUDIO_FILE,
     ICON_COUNT

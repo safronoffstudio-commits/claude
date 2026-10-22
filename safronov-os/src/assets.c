@@ -43,12 +43,13 @@ const uint32_t asset_icon[ICON_COUNT][ICON_MIPS] = {
     { 3527408, 3592960, 3609360, 3613472 },  /* PHOTOS */
     { 3614512, 3680064, 3696464, 3700576 },  /* PLAYER */
     { 3701616, 3767168, 3783568, 3787680 },  /* CALENDAR */
-    { 3788720, 3854272, 3870672, 3874784 },  /* IMAGE_FILE */
-    { 3875824, 3941376, 3957776, 3961888 },  /* AUDIO_FILE */
+    { 3788720, 3854272, 3870672, 3874784 },  /* RECYCLE */
+    { 3875824, 3941376, 3957776, 3961888 },  /* IMAGE_FILE */
+    { 3962928, 4028480, 4044880, 4048992 },  /* AUDIO_FILE */
 };
 const uint16_t asset_icon_size[ICON_MIPS] = { 128, 64, 32, 16 };
-const uint32_t asset_logo[LOGO_SIZES] = { 3962928, 3963968, 3968080, 3984480, 4050032 };
-const uint32_t asset_cursor[2] = { 4312192, 4314512 };
-const uint32_t asset_wallpaper[WALLPAPER_COUNT] = { 4323744, 7779776, 8547792, 9315808 };
+const uint32_t asset_logo[LOGO_SIZES] = { 4050032, 4051072, 4055184, 4071584, 4137136 };
+const uint32_t asset_cursor[2] = { 4399296, 4401616 };
+const uint32_t asset_wallpaper[WALLPAPER_COUNT] = { 4410848, 10554880, 11322896, 12090912 };
 const char *const asset_wallpaper_name[WALLPAPER_COUNT] = { "Bloom", "Закат", "Океан", "Ночь" };
-const uint32_t asset_wallpaper_dark = 6051760;
+const uint32_t asset_wallpaper_dark = 7482864;

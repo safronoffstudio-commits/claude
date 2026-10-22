@@ -82,6 +82,7 @@ struct app_def {
 #define WF_NO_BUTTONS   0x08     /* no traffic lights (alerts) */
 #define WF_NO_ZOOM      0x10
 #define WF_MODAL        0x20
+#define WF_MICA         0x40     /* background shows the blurred wallpaper (redrawn when moved) */
 
 struct window {
     struct window *next;         /* z-order: bottom to top */
@@ -125,6 +126,8 @@ void win_zoom(struct window *w);
 struct window *win_focused(void);
 struct window *win_of_app(const struct app_def *app);
 void win_center(struct window *w);
+/* Windows 11 "Mica": the blurred wallpaper behind the window, tinted. Points. */
+void mica_fill(struct canvas *c, struct window *w, int x, int y, int ww, int hh, uint32_t tint);
 
 const struct app_def *app_by_id(const char *id);
 void app_launch(const char *id, const char *arg);
