@@ -109,3 +109,5 @@ void sys_poweroff(void);
 void panic(const char *msg);
 
 const char *strstr_simple(const char *hay, const char *needle);
+
+void net_init(void);

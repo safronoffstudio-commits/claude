@@ -29,7 +29,7 @@ static App *pressed_app;
 static int cc_drag = -1;
 
 /* ---- Раскладка домашнего экрана ---- */
-static App *const GRID[] = { &app_photos, &app_paint, &app_snake, &app_2048, &app_calendar, &app_clock, &app_monitor };
+static App *const GRID[] = { &app_telegram, &app_photos, &app_paint, &app_snake, &app_2048, &app_calendar, &app_clock, &app_monitor };
 static App *const DOCK[] = { &app_notes, &app_calc, &app_terminal, &app_settings };
 #define COL_X(i)   (36 + (i) * 128)
 #define WIDGET_Y   88

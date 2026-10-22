@@ -61,6 +61,10 @@ void kmain(void) {
     timer_init();
     if (!fb_init(SCREEN_W, SCREEN_H)) panic("нет видеовыхода");
     input_init();
+    net_init();
+#ifdef NET_SELFTEST
+    { void net_selftest(void); net_selftest(); }
+#endif
     rand_seed((u32)timer_ticks() ^ (u32)rtc_seconds());
     irq_enable();
     kprintf("[kernel] железо готово за %lu мс, запускаю оболочку\n", timer_ms());

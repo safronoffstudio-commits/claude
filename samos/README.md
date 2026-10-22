@@ -17,9 +17,50 @@ UI-фреймворков и шрифтовых движков. Код ядра,
 | Графика | свой 2D-движок: сглаженные фигуры через SDF, скругления, градиенты, «матовое стекло» (размытие), тени, масштабирование, альфа-смешивание |
 | Текст | свой рендер UTF-8 текста, кириллица, перенос строк |
 | Оболочка | загрузочный экран, экран блокировки, домашний экран с виджетами и доком, Dynamic Island, пункт управления, жесты, анимации запуска и закрытия приложений, светлая и тёмная темы, четыре варианта обоев |
-| Приложения | Калькулятор, Заметки (экранная клавиатура ЙЦУКЕН/QWERTY), Терминал (оболочка `samsh`), Настройки, Фото (фракталы и пейзажи генерируются на устройстве), Холст, Змейка, 2048, Календарь (праздники РФ), Часы (мировое время с летним временем и секундомер), Монитор системы |
+| Сеть | свой стек с нуля: драйвер virtio-net, Ethernet, ARP, IPv4, ICMP (ping), UDP, DHCP, DNS, TCP |
+| Криптография | свои SHA-1, SHA-256, AES-256 (режимы IGE и CTR), большие числа с умножением Монтгомери (RSA-2048, Диффи-Хеллман-2048), факторизация pq (Поллард-Брент) |
+| Telegram / MTProto | свой клиент протокола MTProto 2.0: TL-сериализация, транспорты (abridged/intermediate/full), рукопожатие создания `auth_key` (req_pq → RSA_PAD → Диффи-Хеллман), зашифрованный слой сообщений (msg_key, AES-IGE), приложение Telegram |
+| Приложения | **Telegram** (свой MTProto), Калькулятор, Заметки (экранная клавиатура ЙЦУКЕН/QWERTY), Терминал (оболочка `samsh`), Настройки, Фото (фракталы и пейзажи генерируются на устройстве), Холст, Змейка, 2048, Календарь (праздники РФ), Часы (мировое время с летним временем и секундомер), Монитор системы |
 
-Своего кода около 5200 строк. Ещё есть файл `gfx/fontdata.c` — его генерирует скрипт, это просто данные.
+Своего кода около 8000 строк. Ещё есть файл `gfx/fontdata.c` — его генерирует скрипт, это просто данные.
+
+## Telegram и сеть
+
+В SamOS нет готового сетевого стека — всё написано с нуля: драйвер сетевой карты,
+TCP/IP и сам протокол Telegram (MTProto 2.0) с шифрованием. Приложение Telegram
+выполняет **настоящее рукопожатие** с сервером: req_pq, разложение pq, шифрование
+RSA_PAD публичным ключом Telegram, обмен Диффи-Хеллмана и согласование `auth_key`,
+затем зашифрованный обмен сообщениями (AES-IGE на ключе, выведенном из `auth_key`).
+
+![Telegram](screenshots/tg5_connected.png)
+
+**Как это проверено.** Из этой среды сборки серверы Telegram недоступны (исходящий
+прокси перехватывает порт 443 и ждёт TLS/HTTP). Поэтому:
+
+- Криптография сверена с известными тест-векторами: `make check`
+  (SHA-1/256, AES-256, AES-IGE, modpow RSA-2048 и Диффи-Хеллман-2048, факторизация pq).
+- Весь протокол проверен end-to-end против **независимого MTProto-сервера на Python**
+  (`tools/mtproto_server.py`, на библиотеке `cryptography`): SamOS и сервер
+  независимо вычисляют один и тот же 256-байтный `auth_key`, после чего проходит
+  зашифрованный `ping → pong`. Команда: `make mtprototest`, затем запуск сервера и
+  образа (см. ниже).
+- Нижние слои (DHCP, DNS, ICMP, TCP) проверены против живого интернета через QEMU:
+  TCP-рукопожатие с дата-центром Telegram по IP проходит, HTTP-запрос к хосту работает.
+
+На реальном телефоне (через Termux + QEMU) приложение дотянется до настоящих серверов
+Telegram тем же кодом. Полноценный вход (ввод номера, SMS-код, список диалогов) —
+следующий слой: он требует `api_id`/`api_hash` и ещё части TL-схемы API; сейчас
+экран номера и список чатов показаны на демонстрационных данных, а криптоядро и
+транспорт — настоящие.
+
+Проверка протокола локально:
+
+```sh
+make mtprototest                        # сборка с тестовым ключом
+python3 tools/mtproto_server.py 7777 &  # независимый MTProto-сервер на хосте
+./run.sh -netdev user,id=n0 -device virtio-net-device,netdev=n0
+# в логе ядра: «рукопожатие УСПЕХ», совпадающий auth_key_id и «ping → pong»
+```
 
 ## Скриншоты
 
@@ -31,6 +72,7 @@ SamOS в эмуляторе, нажимает «пальцем», печатае
 | ![](screenshots/02_lock.png) | ![](screenshots/03_home.png) | ![](screenshots/19_control_center.png) | ![](screenshots/04_app_open_anim.png) |
 | ![](screenshots/07_calculator.png) | ![](screenshots/08_notes_keyboard.png) | ![](screenshots/09_terminal.png) | ![](screenshots/10_paint.png) |
 | ![](screenshots/17_settings.png) | ![](screenshots/20_settings_dark.png) | ![](screenshots/18_about.png) | ![](screenshots/16_monitor.png) |
+| ![](screenshots/tg1_welcome.png) | ![](screenshots/tg3_phone.png) | ![](screenshots/tg6_chats.png) | ![](screenshots/tg7_chat.png) |
 
 ## Запуск на Android-телефоне
 
@@ -71,6 +113,8 @@ run.bat           # Windows
 make            # build/samos.elf
 make dist       # dist/samos.elf — готовый файл без отладочной информации
 make test       # автотест со скриншотами (нужны QEMU и Python + Pillow)
+make check      # проверка криптографии на тест-векторах (на хосте)
+make mtprototest # сборка для проверки MTProto против локального сервера
 make fonts      # перегенерировать растровые шрифты (нужен Pillow)
 ```
 
@@ -80,10 +124,16 @@ make fonts      # перегенерировать растровые шрифт
 kernel/   boot.S, vectors.S — старт и исключения; mmu, gic, irq, timer, fdt,
           fb (ramfb), virtio_input, uart, mem, lib (строки, printf)
 gfx/      gfx.c — 2D-движок; font.c — текст; fontdata.c — растры глифов
+net/      virtio_net — драйвер; net.c — Ethernet/ARP/IP/ICMP/UDP/DHCP/DNS;
+          tcp.c — TCP; nettest.c — самопроверка сети
+crypto/   sha1, sha256, aes (IGE/CTR), bn (большие числа), tg_keys (ключи Telegram)
+mtproto/  mtproto.c — рукопожатие auth_key; mtp_crypto.c — зашифрованный слой
 ui/       shell.c — оболочка и главный цикл; keyboard, widgets, icons,
           wallpaper, time (часовые пояса)
-apps/     11 приложений
-tools/    mkfont.py — генератор шрифтов; qemu_driver.py, demo_test.py — автотесты
+apps/     12 приложений (включая Telegram)
+tools/    mkfont.py — генератор шрифтов; crypto_test.c — тест-векторы;
+          mtproto_server.py — независимый сервер для проверки MTProto;
+          qemu_driver.py, demo_test.py — автотесты со скриншотами
 ```
 
 ## Что взято не с нуля

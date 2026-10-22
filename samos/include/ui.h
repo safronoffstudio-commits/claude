@@ -127,4 +127,5 @@ u32  kb_touch(Keyboard *kb, int type, int x, int y);   // символ или KE
 void photos_preload(void);
 void settings_preload(void);
 extern App app_photos, app_paint, app_snake, app_2048, app_calendar, app_clock,
-    app_monitor, app_notes, app_calc, app_terminal, app_settings;
+    app_monitor, app_notes, app_calc, app_terminal, app_settings, app_telegram;
+void icon_telegram(Canvas *c, float x, float y, float s);

@@ -1,1 +1,3 @@
 build/
+tools/test_server_key.pem
+mtproto/mtproto_testkey.c
